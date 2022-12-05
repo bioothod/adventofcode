@@ -44,7 +44,7 @@ def load_crates(lines_generator):
     return crates
 
 def run_instructions(lines_generator, crates, version):
-    instruction_template = re.compile('move ([\d]+) from ([\d]+) to ([\d]+)')
+    instruction_template = re.compile('move ([\\d]+) from ([\\d]+) to ([\\d]+)')
     for instruction in lines_generator:
         res = instruction_template.match(instruction)
         if not res:
