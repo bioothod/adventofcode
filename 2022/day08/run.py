@@ -15,7 +15,7 @@ class Forest:
             row = [int(l) for l in line]
             self.rows.append(row)
 
-    def distance_equal(self, tree: int, array: List[int], op) -> int:
+    def distance_equal(self, tree: int, array: List[int]) -> int:
         dist = 0
         for t in array:
             dist += 1
@@ -23,7 +23,7 @@ class Forest:
                 break
         return dist
 
-    def distance_unobstructed(self, tree: int, array: List[int], op) -> int:
+    def distance_unobstructed(self, tree: int, array: List[int]) -> int:
         dist = 0
         for t in array:
             if tree <= t:
@@ -41,25 +41,23 @@ class Forest:
 
         tree = self.rows[row][col]
 
-        op = lambda tree, t: tree <= t
-
         array = self.rows[row][:col][::-1]
-        if self.distance_unobstructed(tree, array, op) == len(array):
+        if self.distance_unobstructed(tree, array) == len(array):
             return True
 
         array = self.rows[row][col+1:]
-        if self.distance_unobstructed(tree, array, op) == len(array):
+        if self.distance_unobstructed(tree, array) == len(array):
             return True
 
 
         column = [self.rows[i][col] for i in range(len(self.rows))]
 
         array = column[:row][::-1]
-        if self.distance_unobstructed(tree, array, op) == len(array):
+        if self.distance_unobstructed(tree, array) == len(array):
             return True
 
         array = column[row+1:]
-        if self.distance_unobstructed(tree, array, op) == len(array):
+        if self.distance_unobstructed(tree, array) == len(array):
             return True
 
         return False
@@ -83,14 +81,12 @@ class Forest:
         tree = self.rows[row][col]
         score = 1
 
-        op = lambda tree, t: tree <= t
-
-        score *= self.distance_equal(tree, self.rows[row][:col][::-1], op)
-        score *= self.distance_equal(tree, self.rows[row][col+1:], op)
+        score *= self.distance_equal(tree, self.rows[row][:col][::-1])
+        score *= self.distance_equal(tree, self.rows[row][col+1:])
 
         column = [self.rows[i][col] for i in range(len(self.rows))]
-        score *= self.distance_equal(tree, column[:row][::-1], op)
-        score *= self.distance_equal(tree, column[row+1:], op)
+        score *= self.distance_equal(tree, column[:row][::-1])
+        score *= self.distance_equal(tree, column[row+1:])
 
         return score
 
