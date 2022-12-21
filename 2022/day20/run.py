@@ -103,8 +103,8 @@ def main():
     print(f'part1: {part1_res}')
 
     solution.reset(mult=811589153)
-    part1_res = solution.mix(n=10)
-    print(f'part1: {part1_res}')
+    part2_res = solution.mix(n=10)
+    print(f'part2: {part2_res}')
 
 if __name__ == '__main__':
     main()
