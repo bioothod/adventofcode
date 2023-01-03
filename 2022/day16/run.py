@@ -100,6 +100,7 @@ class Solution:
                 if node.rate > 0 and not current_state.node_is_opened(node):
                     new_actions.append((ActionType.OPEN, node))
 
+                # skip moving back to the nodes which have been passed after the last open action
                 for dst in node.reachable.values():
                     if dst.id not in current_state.moves_after_open[worker_id]:
                         new_actions.append((ActionType.MOVE, dst))
@@ -130,6 +131,8 @@ class Solution:
 
             actions_to_explore = sorted(actions_to_explore, key=lambda a: a.accumulated_score, reverse=True)
             num_actions = len(actions_to_explore)
+
+            # this needs to be optimized to limit moves only towards unopened nodes with positive rate
             max_actions = 1000
             actions_to_explore = actions_to_explore[:max_actions]
             max_score_action = actions_to_explore[0]
