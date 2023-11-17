@@ -1,10 +1,11 @@
-from typing import List, Dict, Tuple, Optional
+from typing import Callable, List, Dict, Tuple, Optional
 
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from copy import deepcopy
 
 import argparse
+import itertools
 
 def load_input(fn):
     with open(fn, 'r') as fin:
@@ -46,6 +47,24 @@ class Point:
     t: PointType
     plane: int
 
+    def __repr__(self) -> str:
+        #return f'({self.x}.{self.y}), t{self.t.__repr__()}, plane: {self.plane}'
+        return f'{self.x}.{self.y}'
+
+    def __add__(self, other: 'Point') -> 'Point':
+        self.x += other.x
+        self.y += other.y
+        return self
+
+    def __sub__(self, other: 'Point') -> 'Point':
+        self.x -= other.x
+        self.y -= other.y
+        return self
+
+    def __floordiv__(self, n: int) -> 'Point':
+        self.x = self.x // n
+        self.y = self.y // n
+        return self
 
 class Turn(Enum):
     CLOCK = 0,
@@ -78,28 +97,43 @@ class Direction(IntEnum):
     def __str__(self) -> str:
         return self.__repr__()
 
+    def rotate(self, degree) -> 'Direction':
+        if degree == 0:
+            res = self
+        elif degree == 90:
+            res = (self + 1) % 4
+        elif degree == 270:
+            res = (self - 1) % 4
+        elif degree == 180:
+            res = (self + 2) % 4
+        else:
+            raise ValueError(f'invalid rotation degree {degree}')
+        return Direction(res)
+
 class Facing:
     def __init__(self, initial: Direction):
         self.dir = initial
 
     def turn(self, turn: Turn):
         if turn == Turn.CLOCK:
-            self.dir = Direction((self.dir + 1) % 4)
+            self.dir = self.dir.rotate(90)
         elif turn == Turn.COUNTER:
-            self.dir = Direction((self.dir - 1) % 4)
+            self.dir = self.dir.rotate(270)
         elif turn == Turn.STILL:
             pass
         else:
             raise ValueError(f'unsupported turn "{turn}"')
 
 class FlatPlane:
-    def __init__(self, size: int, start_y: int, start_x: int):
+    def __init__(self, id: int, size: int, start_y: int, start_x: int):
+        self.id = id
         self.size = size
         self.start_x = start_x
         self.start_y = start_y
+        self.transitions: Dict[Direction, Tuple['FlatPlane', Direction, Callable]] = {}
 
     def __repr__(self) -> str:
-        return f'[flat_y: [{self.start_y}, {self.start_y+self.size}], flat_x: [{self.start_x}, {self.start_x+self.size}]]'
+        return f'[{self.id}: {self.start_x}.{self.start_y}-{self.start_x+self.size}.{self.start_y+self.size}]'
 
     def point_in(self, pos: Point) -> bool:
         if pos.x < self.start_x or pos.y < self.start_y:
@@ -128,167 +162,174 @@ class FlatPlane:
 
         return pos
 
-class CubeFold1:
-    def __init__(self, cube_size: int):
-        self.cube_size = cube_size
-        self.planes = {
-            1: FlatPlane(size=self.cube_size, start_y=1, start_x=9),
-            2: FlatPlane(size=self.cube_size, start_y=5, start_x=1),
-            3: FlatPlane(size=self.cube_size, start_y=5, start_x=5),
-            4: FlatPlane(size=self.cube_size, start_y=5, start_x=9),
-            5: FlatPlane(size=self.cube_size, start_y=9, start_x=9),
-            6: FlatPlane(size=self.cube_size, start_y=9, start_x=13),
-        }
-        self.transitions = {
-            1: {
-                Direction.UP:    (2, 'MX-MY', Direction.DOWN),
-                Direction.LEFT:  (3, 'MX-C', Direction.DOWN),
-                Direction.DOWN:  (4, '', Direction.DOWN),
-                Direction.RIGHT: (6, 'MX-MY', Direction.LEFT),
-            },
-            2: {
-                Direction.UP:    (1, 'MX-MY', Direction.DOWN),
-                Direction.LEFT:  (6, 'MY-C', Direction.UP),
-                Direction.DOWN:  (5, 'MX-MY', Direction.UP),
-                Direction.RIGHT: (3, '', Direction.RIGHT),
-            },
-            3: {
-                Direction.UP:    (1, 'MY-C', Direction.RIGHT),
-                Direction.LEFT:  (2, '', Direction.LEFT),
-                Direction.DOWN:  (5, 'MX-C', Direction.RIGHT),
-                Direction.RIGHT: (4, '', Direction.RIGHT),
-            },
-            4: {
-                Direction.UP:    (1, '', Direction.UP),
-                Direction.LEFT:  (3, '', Direction.LEFT),
-                Direction.DOWN:  (5, '', Direction.DOWN),
-                Direction.RIGHT: (6, 'MY-C', Direction.DOWN),
-            },
-            5: {
-                Direction.UP:    (4, '', Direction.UP),
-                Direction.LEFT:  (3, 'MY-C', Direction.UP),
-                Direction.DOWN:  (2, 'MY-MX', Direction.UP),
-                Direction.RIGHT: (6, '', Direction.RIGHT),
-            },
-            6: {
-                Direction.UP:    (4, 'MX-C', Direction.LEFT),
-                Direction.LEFT:  (5, '', Direction.LEFT),
-                Direction.DOWN:  (2, 'MX-C', Direction.RIGHT),
-                Direction.RIGHT: (1, 'MY-MX', Direction.LEFT),
-            },
-        }
-
-    def relative_transform(self, p: Point, transform: str) -> Point:
-        x = p.x
-        y = p.y
-        for op in transform.split('-'):
-            if op == 'MX':
-                x = self.cube_size - x + 1
-            elif op == 'MY':
-                y = self.cube_size - y + 1
-            elif op == 'C':
-                tmp = x
-                x = y
-                y = tmp
-
-        return Point(y=y, x=x, t=PointType.WALL, plane=0)
-
-
-    def flat_point_to_plane(self, point: Point):
-        for plane_id, plane in self.planes.items():
-            if plane.point_in(point):
-                point.plane = plane_id
-                return
-
-class CubeFold2:
-    def __init__(self, cube_size: int):
-        self.cube_size = cube_size
-        self.planes = {
-            1: FlatPlane(size=self.cube_size, start_y=1, start_x=51),
-            2: FlatPlane(size=self.cube_size, start_y=1, start_x=101),
-            3: FlatPlane(size=self.cube_size, start_y=51, start_x=51),
-            4: FlatPlane(size=self.cube_size, start_y=101, start_x=1),
-            5: FlatPlane(size=self.cube_size, start_y=101, start_x=51),
-            6: FlatPlane(size=self.cube_size, start_y=151, start_x=1),
-        }
-        self.transitions = {
-            1: {
-                Direction.UP:    (6, 'MY-C', Direction.RIGHT),
-                Direction.LEFT:  (4, 'MX-MY', Direction.RIGHT),
-                Direction.DOWN:  (3, '', Direction.DOWN),
-                Direction.RIGHT: (2, '', Direction.RIGHT),
-            },
-            2: {
-                Direction.UP:    (6, '', Direction.UP),
-                Direction.LEFT:  (1, '', Direction.LEFT),
-                Direction.DOWN:  (3, 'MY-C', Direction.LEFT),
-                Direction.RIGHT: (5, 'MY-MX', Direction.LEFT),
-            },
-            3: {
-                Direction.UP:    (1, '', Direction.UP),
-                Direction.LEFT:  (4, 'MX-C', Direction.DOWN),
-                Direction.DOWN:  (5, '', Direction.DOWN),
-                Direction.RIGHT: (2, 'MX-C', Direction.UP),
-            },
-            4: {
-                Direction.UP:    (3, 'MY-C', Direction.RIGHT),
-                Direction.LEFT:  (1, 'MX-MY', Direction.RIGHT),
-                Direction.DOWN:  (6, '', Direction.DOWN),
-                Direction.RIGHT: (5, '', Direction.RIGHT),
-            },
-            5: {
-                Direction.UP:    (3, '', Direction.UP),
-                Direction.LEFT:  (4, '', Direction.LEFT),
-                Direction.DOWN:  (6, 'MY-C', Direction.LEFT),
-                Direction.RIGHT: (2, 'MX-MY', Direction.LEFT),
-            },
-            6: {
-                Direction.UP:    (4, '', Direction.UP),
-                Direction.LEFT:  (1, 'MX-C', Direction.DOWN),
-                Direction.DOWN:  (2, '', Direction.DOWN),
-                Direction.RIGHT: (5, 'MX-C', Direction.UP),
-            },
-        }
-
-    def relative_transform(self, p: Point, transform: str) -> Point:
-        x = p.x
-        y = p.y
-        for op in transform.split('-'):
-            if op == 'MX':
-                x = self.cube_size - x + 1
-            elif op == 'MY':
-                y = self.cube_size - y + 1
-            elif op == 'C':
-                tmp = x
-                x = y
-                y = tmp
-
-        return Point(y=y, x=x, t=PointType.WALL, plane=0)
-
-
-    def flat_point_to_plane(self, point: Point):
-        for plane_id, plane in self.planes.items():
-            if plane.point_in(point):
-                point.plane = plane_id
-                return
-
 class Map:
-    def __init__(self, is_small=True):
+    def __init__(self):
         self.map = []
         self.width = 0
         self.height = 0
+        self.cube_size = 0
+        self.planes = {}
 
-        if is_small:
-            self.cube_size = 4
-            self.fold = CubeFold1(self.cube_size)
-        else:
-            self.cube_size = 50
-            self.fold = CubeFold2(self.cube_size)
+    def divide_map_to_planes(self, width_div, height_div) -> Tuple[int, bool]:
+        width_rem = self.width % width_div
+        width = self.width // width_div
+        height_rem = self.height % height_div
+        height = self.height // height_div
+        if width_rem == 0 and height_rem == 0 and width == height:
+            return width, True
+
+        return 0, False
+
+    def scan_planes(self):
+        plane_size, found = self.divide_map_to_planes(3, 4)
+        if not found:
+            plane_size, found = self.divide_map_to_planes(4, 3)
+            if not found:
+                raise ValueError(f'could not determine plane size from the map height: {self.height} and width: {self.width}')
+
+        print(f'map: height: {self.height}, width: {self.width}, plane_size: {plane_size}')
+        self.cube_size = plane_size
+
+        plane_idx = 1
+        print(f'planes:')
+        for height_idx in range(0, self.height // self.cube_size):
+            plane_str = '  '
+            for width_idx in range(0, self.width // self.cube_size):
+                y = height_idx * self.cube_size + 1
+                x = width_idx * self.cube_size + 1
+                p = self.map[y][x]
+                if p.t == PointType.EMPTY:
+                    plane_str += '.'
+                    continue
+
+                plane = FlatPlane(plane_idx, self.cube_size, y, x)
+                self.planes[plane_idx] = plane
+                plane_str += str(plane_idx)
+                plane_idx += 1
+
+            print(plane_str)
+
+        for plane in self.planes.values():
+            self.find_transitions(plane)
+
+    def find_plane(self, point: Point) -> Optional[FlatPlane]:
+        for plane in self.planes.values():
+            if plane.point_in(point):
+                return plane
+
+        return None
+
+    def rotate_around(self, centre: Point, point: Point, R: List[List[int]]) -> Point:
+        point = deepcopy(point)
+        point -= centre
+
+        x = R[0][0] * point.x + R[0][1] * point.y
+        y = R[1][0] * point.x + R[1][1] * point.y
+
+        point.x = x
+        point.y = y
+
+        point += centre
+        return point
+
+    def find_transitions_around(self, plane: FlatPlane, centres: List[Point], point: Point, direction: Direction):
+        rotation_matrixes = {
+            90: [
+                [0, -1],
+                [1, 0],
+            ],
+            270: [
+                [0, 1],
+                [-1, 0],
+            ]
+        }
+
+        for centre in centres:
+            for rot_degree in [90, 270]:
+                rot_matrix = rotation_matrixes[rot_degree]
+                new_point = self.rotate_around(centre, point, rot_matrix)
+                new_direction = direction.rotate(rot_degree)
+
+                other_plane = self.find_plane(new_point)
+                if other_plane is not None and other_plane.id != plane.id:
+                    plane.transitions[direction] = (other_plane, new_direction, lambda pos: self.rotate_around(centre, pos, rot_matrix))
+                    print(f'transition: {plane.id} {direction} -> {other_plane.id} {new_direction}')
+
+
+    def find_transitions(self, plane: FlatPlane):
+
+        directions = {
+            Direction.UP: [
+                [plane.start_x, plane.start_y],
+                [plane.start_x+plane.size-1, plane.start_y],
+            ],
+            Direction.LEFT: [
+                [plane.start_x, plane.start_y],
+                [plane.start_x, plane.start_y+plane.size-1],
+            ],
+            Direction.RIGHT: [
+                [plane.start_x+plane.size-1, plane.start_y],
+                [plane.start_x+plane.size-1, plane.start_y+plane.size-1],
+            ],
+            Direction.DOWN: [
+                [plane.start_x, plane.start_y+plane.size-1],
+                [plane.start_x+plane.size-1, plane.start_y+plane.size-1],
+            ],
+        }
+
+        for direction, edge in directions.items():
+            if direction in plane.transitions:
+                continue
+
+            p0, p1 = edge
+
+            p0x, p0y = p0
+            p0 = deepcopy(self.map[p0y-1][p0x-1])
+            p1x, p1y = p1
+            p1 = deepcopy(self.map[p1y-1][p1x-1])
+
+
+            mid = deepcopy(p0)
+            mid += p1
+            mid //= 2
+
+            mid = plane.step(mid, direction)
+            other_plane = self.find_plane(mid)
+            if other_plane is not None:
+                plane.transitions[direction] = (other_plane, direction, lambda pos: pos)
+                other_plane.transitions[direction.rotate(180)] = (plane, direction, lambda pos: pos)
+                #print(f'transition: {plane.id} {direction} -> {other_plane.id}')
+                continue
+
+            mid = self.wrap_coords(mid)
+
+            possible_rotations  = [
+                [p0, p1, mid, 90],
+                [p0, p1, mid, 270],
+                [p1, p0, mid, 90],
+                [p1, p0, mid, 270],
+            ]
+
+            for centre, second_centre, point, rot_degree in possible_rotations:
+
+                second_direction =
+                rot_degree = 360 - rot_degree
+                rot_matrix = rotation_matrixes[rot_degree]
+                new_point = self.rotate_around(second_centre, new_point, rot_matrix)
+                new_direction = direction.rotate(rot_degree)
+
+                other_plane = self.find_plane(new_point)
+                print(f'plane: {plane.id}, centre: {centre}, point: {point} {direction} -> {new_point} {new_direction}, new_plane: {other_plane}')
+                if other_plane is not None and other_plane.id != plane.id:
+                    plane.transitions[direction] = (other_plane, new_direction, lambda pos: self.rotate_around(centre, pos, rot_matrix))
+                    print(f'transition: {plane.id} {direction} -> {other_plane.id} {new_direction}')
+
+
+
 
 
     def add_point(self, y, x, s):
         point = Point(y, x, PointType.parse(s), 0)
-        self.fold.flat_point_to_plane(point)
         if point.x > self.width:
             self.width = point.x
         if point.y > self.height:
@@ -366,7 +407,7 @@ class Map:
 
         return pos
 
-    def wrap_coords(self, pos):
+    def wrap_coords(self, pos: Point) -> Point:
         pos = deepcopy(pos)
 
         if pos.y == self.cube_size + 1:
@@ -382,28 +423,16 @@ class Map:
         return pos
 
     def single_cube_step(self, pos: Point, direction: Direction) -> Tuple[Point, Direction]:
-        current_plane = self.fold.planes[pos.plane]
+        current_plane = self.find_plane(pos)
+        if current_plane is None:
+            raise ValueError(f'could not locate plane for the point {pos}')
+
         next_pos = current_plane.step(pos, direction)
         if current_plane.point_in(next_pos):
             return next_pos, direction
 
-        next_plane_id, relative_coord_transform, next_direction = self.fold.transitions[pos.plane][direction]
-
-        relative_next_pos = Point(y=next_pos.y-current_plane.start_y+1,
-                                  x=next_pos.x-current_plane.start_x+1,
-                                  t=next_pos.t,
-                                  plane=next_pos.plane)
-        relative_next_pos = self.wrap_coords(relative_next_pos)
-        #print(f'transition1: {pos} {next_direction} -> {next_pos} {next_direction}, current_plane: {current_plane}, relative_next_pos: {relative_next_pos}')
-
-        relative_next_pos = self.fold.relative_transform(relative_next_pos, relative_coord_transform)
-
-        next_plane = self.fold.planes[next_plane_id]
-        next_y = relative_next_pos.y + next_plane.start_y - 1
-        next_x = relative_next_pos.x + next_plane.start_x - 1
-        #print(f'transition2: {pos} {direction} -> plane: {next_plane_id} {next_plane}, y: {next_y}, x: {next_x}, relative_next_pos: {relative_next_pos}')
-        next_point_type = self.map[next_y-1][next_x-1].t
-        next_pos = Point(next_y, next_x, next_point_type, next_plane_id)
+        next_plane, next_direction, rot_callable = current_plane.transitions[direction]
+        next_pos = rot_callable(pos)
 
         #print(f'transition3: {pos} {direction} -> {next_pos} {next_direction}')
         return next_pos, next_direction
@@ -434,8 +463,8 @@ class Map:
         return steps
 
 class Solution:
-    def __init__(self, line_generator, is_small=False):
-        self.map = Map(is_small)
+    def __init__(self, line_generator):
+        self.map = Map()
 
         for y, line in enumerate(line_generator):
             if len(line) == 0:
@@ -445,6 +474,7 @@ class Solution:
                 self.map.add_point(y+1, x+1, s)
 
         self.map.wrap()
+        self.map.scan_planes()
 
         self.route = self.parse_route(next(line_generator))
         self.steps_made = []
@@ -504,11 +534,10 @@ class Solution:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', required=True, type=str, help='Input file')
-    parser.add_argument('--is_small', action='store_true', help='Whether this is a small example with a particular folding')
     FLAGS = parser.parse_args()
 
     line_generator = load_input(FLAGS.input)
-    solution = Solution(line_generator, FLAGS.is_small)
+    solution = Solution(line_generator)
 
     part1 = solution.part1()
     print(f'part1: {part1}')
