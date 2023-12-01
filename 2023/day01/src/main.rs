@@ -107,11 +107,7 @@ fn clear_letters_check_prefix(letters: &Vec<char>) -> Vec<char> {
         }
     }
 
-    if longest_len < letters.len() {
-        letters[letters.len() - longest_len..].to_vec()
-    } else {
-        vec![]
-    }
+    letters[letters.len() - longest_len..].to_vec()
 }
 
 fn calibrate(config: &Config) -> u32 {
