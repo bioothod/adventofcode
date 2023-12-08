@@ -51,7 +51,7 @@ impl Solution {
         let mut steps = 0;
         let mut start = start;
 
-        while !finished(&start) {
+        loop {
             for step in self.instruction.chars() {
                 start = match step {
                     'L' => self.mapl.get(start).unwrap(),
@@ -62,11 +62,10 @@ impl Solution {
                 steps += 1;
 
                 if finished(&start) {
-                    break
+                    return steps;
                 }
             }
         }
-        steps
     }
 
     pub fn stage1(&self) -> usize {
