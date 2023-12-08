@@ -9,6 +9,8 @@ use crate::config::Config;
 use crate::config::Stage;
 mod config;
 
+mod permutations;
+
 fn run(config: Config) -> Result<(), Box<dyn Error>> {
     if config.stage == Stage::ONE {
         let sol = Solution::build(&config);

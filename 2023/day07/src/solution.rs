@@ -2,81 +2,7 @@ use std::collections::HashMap;
 use std::cmp::Ordering;
 
 use crate::config::Config;
-
-pub trait ToPermutationsWithReplacement {
-    type Iter;
-    fn permutations_with_replacement(self, group_len: usize) -> Self::Iter;
-}
-
-impl<I: Iterator> ToPermutationsWithReplacement for I {
-    type Iter = PermutationsReplacementIter<<I as Iterator>::Item>;
-
-    fn permutations_with_replacement(self, group_len: usize) -> Self::Iter {
-        let items = self.collect::<Vec<_>>();
-        PermutationsReplacementIter {
-            permutation: vec![0; group_len],
-            group_len,
-            finished: group_len == 0 || items.len() == 0,
-            items,
-        }
-    }
-}
-
-pub struct PermutationsReplacementIter<I> {
-    items: Vec<I>,
-    permutation: Vec<usize>,
-    group_len: usize,
-    finished: bool,
-}
-
-impl<I: Copy> PermutationsReplacementIter<I> {
-    fn increment_permutation(&mut self) -> bool {
-        let mut idx = 0;
-
-        loop {
-            if idx >= self.permutation.len() {
-                return true;
-            }
-
-            self.permutation[idx] += 1;
-
-            if self.permutation[idx] >= self.items.len() {
-                self.permutation[idx] = 0;
-                idx += 1;
-            } else {
-                return false;
-            }
-        }
-    }
-
-    fn build_vec(&self) -> Vec<I> {
-        let mut vec = Vec::with_capacity(self.group_len);
-
-        for idx in &self.permutation {
-            vec.push(self.items[*idx]);
-        }
-
-        vec
-    }
-}
-
-impl<I: Copy> Iterator for PermutationsReplacementIter<I> {
-    type Item = Vec<I>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            return None;
-        }
-
-        let item = self.build_vec();
-
-        if self.increment_permutation() {
-            self.finished = true;
-        }
-
-        Some(item)
-    }
-}
+use crate::permutations::*;
 
 #[derive(Debug, Clone)]
 struct Hand {
@@ -222,29 +148,21 @@ impl Hand {
     }
 
     fn parse(line: &str) -> Hand {
-        if let Some(hand) = Hand::try_five_of_a_kind(line) {
-            return hand;
-        }
-        if let Some(hand) = Hand::try_four_of_a_kind(line) {
-            return hand;
-        }
-        if let Some(hand) = Hand::try_full_house(line) {
-            return hand;
-        }
-        if let Some(hand) = Hand::try_three_of_a_kind(line) {
-            return hand;
-        }
-        if let Some(hand) = Hand::try_two_pair(line) {
-            return hand;
-        }
-        if let Some(hand) = Hand::try_one_pair(line) {
-            return hand;
-        }
-        if let Some(hand) = Hand::try_high_card(line) {
-            return hand;
-        }
+        let hand_options = vec![
+            Hand::try_five_of_a_kind,
+            Hand::try_four_of_a_kind,
+            Hand::try_full_house,
+            Hand::try_three_of_a_kind,
+            Hand::try_two_pair,
+            Hand::try_one_pair,
+            Hand::try_high_card,
+        ];
 
-        println!("unsupported hand: {}", line);
+        for option in hand_options.iter() {
+            if let Some(hand) = option(line) {
+                return hand;
+            }
+        }
         panic!("unsupported card description {}", line);
     }
 
@@ -257,6 +175,7 @@ impl Hand {
         let joker_indexes = self.id.match_indices('J');
         let mut max_hand = self.clone();
         let original_id = self.id.clone();
+        let original_bid = self.bid;
 
         let cartesian = STRENGTHS[0..(STRENGTHS.len()-1)].iter().permutations_with_replacement(*num_jokers);
         for possible in cartesian {
@@ -267,8 +186,7 @@ impl Hand {
             }
 
             let new_str = String::from_iter(new_str);
-            let mut new_hand = Hand::parse(&new_str);
-            new_hand.bid = self.bid;
+            let new_hand = Hand::parse(&new_str);
             let is_better = new_hand > max_hand;
 
             if is_better {
@@ -278,7 +196,9 @@ impl Hand {
 
         if &max_hand > self {
             *self = max_hand;
+
             self.id = original_id;
+            self.bid = original_bid;
         }
     }
 }
@@ -287,22 +207,7 @@ const STRENGTHS: [char; 14] = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5',
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.strength != other.strength {
-            return self.strength.cmp(&other.strength);
-        }
-
-        for (s, o) in self.id.chars().zip(other.id.chars()) {
-            if s == o {
-                continue
-            }
-
-            let self_strength = STRENGTHS.iter().rev().position(|x| *x == s).unwrap();
-            let other_strength = STRENGTHS.iter().rev().position(|x| *x == o).unwrap();
-
-            return self_strength.cmp(&other_strength);
-        }
-
-        Ordering::Equal
+        self.partial_cmp(other).unwrap()
     }
 }
 impl Eq for Hand {}
