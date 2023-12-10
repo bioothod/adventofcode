@@ -11,13 +11,12 @@ impl Stage {
     pub fn parse(arg: &str) -> Stage {
         let stage_int = arg.parse::<i32>().unwrap();
         if stage_int == 1 {
-            return Stage::ONE;
+            Stage::ONE
         } else if stage_int == 2 {
-            return Stage::TWO;
+            Stage::TWO
         } else {
             panic!("Invalid stage {stage_int}");
         }
-
     }
 }
 
@@ -38,14 +37,13 @@ impl Config {
         if args.len() == 3 {
             let file_path = args[2].clone();
 
-            content = fs::read_to_string(&file_path).map_err(|err| {
-                format!("could not read file \"{file_path}\": {err}")
-            })?;
+            content = fs::read_to_string(&file_path)
+                .map_err(|err| format!("could not read file \"{file_path}\": {err}"))?;
         }
 
-        Ok(Config{
+        Ok(Config {
             stage: Stage::parse(&args[1]),
-            content: content,
+            content,
         })
     }
 }

@@ -26,7 +26,8 @@ impl Pipe {
             Pipe::SE => char::from_u32(0x250c),
             Pipe::GROUND => Some('.'),
             Pipe::START => Some('S'),
-        }.unwrap()
+        }
+        .unwrap()
     }
 }
 
@@ -36,7 +37,6 @@ impl fmt::Debug for Pipe {
     }
 }
 
-
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 struct Coord {
     y: isize,
@@ -45,20 +45,38 @@ struct Coord {
 
 impl Coord {
     fn new(y: isize, x: isize) -> Coord {
-        Coord {y: y, x: x}
+        Coord { y, x }
     }
     fn default() -> Coord {
-        Coord {y: -1, x: -1}
+        Coord { y: -1, x: -1 }
     }
 
     fn connects(&self, pipe: &Pipe) -> Vec<Coord> {
         match pipe {
-            Pipe::NS => vec![Coord::new(self.y-1, self.x), Coord::new(self.y+1, self.x)],
-            Pipe::EW => vec![Coord::new(self.y, self.x+1), Coord::new(self.y, self.x-1)],
-            Pipe::NE => vec![Coord::new(self.y-1, self.x), Coord::new(self.y, self.x+1)],
-            Pipe::NW => vec![Coord::new(self.y-1, self.x), Coord::new(self.y, self.x-1)],
-            Pipe::SW => vec![Coord::new(self.y+1, self.x), Coord::new(self.y, self.x-1)],
-            Pipe::SE => vec![Coord::new(self.y+1, self.x), Coord::new(self.y, self.x+1)],
+            Pipe::NS => vec![
+                Coord::new(self.y - 1, self.x),
+                Coord::new(self.y + 1, self.x),
+            ],
+            Pipe::EW => vec![
+                Coord::new(self.y, self.x + 1),
+                Coord::new(self.y, self.x - 1),
+            ],
+            Pipe::NE => vec![
+                Coord::new(self.y - 1, self.x),
+                Coord::new(self.y, self.x + 1),
+            ],
+            Pipe::NW => vec![
+                Coord::new(self.y - 1, self.x),
+                Coord::new(self.y, self.x - 1),
+            ],
+            Pipe::SW => vec![
+                Coord::new(self.y + 1, self.x),
+                Coord::new(self.y, self.x - 1),
+            ],
+            Pipe::SE => vec![
+                Coord::new(self.y + 1, self.x),
+                Coord::new(self.y, self.x + 1),
+            ],
             _ => vec![Coord::default(); 2],
         }
     }
@@ -76,8 +94,8 @@ struct Map {
 
 impl Map {
     fn parse_line(line: &str) -> Vec<Pipe> {
-        line.chars().map(|c| {
-            match c {
+        line.chars()
+            .map(|c| match c {
                 '|' => Pipe::NS,
                 '-' => Pipe::EW,
                 'L' => Pipe::NE,
@@ -87,12 +105,15 @@ impl Map {
                 '.' => Pipe::GROUND,
                 'S' => Pipe::START,
                 _ => panic!("unsupported map symbol {c}"),
-            }
-        }).collect::<Vec<Pipe>>()
+            })
+            .collect::<Vec<Pipe>>()
     }
 
     fn is_valid(&self, c: &Coord) -> bool {
-        c.y >= 0 && c.y < (self.data.len() as isize) && c.x >= 0 && c.x < (self.data[0].len() as isize)
+        c.y >= 0
+            && c.y < (self.data.len() as isize)
+            && c.x >= 0
+            && c.x < (self.data[0].len() as isize)
     }
 
     fn get(&self, c: &Coord) -> Option<Pipe> {
@@ -107,7 +128,7 @@ impl Map {
             for (x, column) in row.iter().enumerate() {
                 if column == &Pipe::START {
                     self.start = Coord::new(y as isize, x as isize);
-                    return
+                    return;
                 }
             }
         }
@@ -116,23 +137,26 @@ impl Map {
     }
 
     fn next(&self, start: &Coord) -> Vec<Coord> {
-        let Some(pipe) = self.get(start) else { panic!("start {:?} is outside the map", start); };
+        let Some(pipe) = self.get(start) else {
+            panic!("start {:?} is outside the map", start);
+        };
 
         if pipe == Pipe::START {
             let mut start_connects: Vec<Coord> = vec![];
-            for y in (start.y-1)..=(start.y+1) {
-                for x in (start.x-1)..=(start.x+1) {
+            for y in (start.y - 1)..=(start.y + 1) {
+                for x in (start.x - 1)..=(start.x + 1) {
                     let c = Coord::new(y, x);
                     if let Some(p) = self.get(&c) {
                         if p == Pipe::GROUND {
-                            continue
+                            continue;
                         }
 
-                        let connects: Vec<Coord> = c.connects(&p)
+                        let connects: Vec<Coord> = c
+                            .connects(&p)
                             .into_iter()
                             .filter(|pc| self.is_valid(pc) && !pc.is_default() && pc == start)
                             .collect();
-                        if connects.len() > 0 {
+                        if !connects.is_empty() {
                             start_connects.push(c);
                         }
                     }
@@ -142,13 +166,17 @@ impl Map {
             return start_connects;
         }
 
-        let connects: Vec<Coord> = start.connects(&pipe).into_iter().map(|c| {
-            if self.is_valid(&c) && !c.is_default() {
-                c
-            } else {
-                Coord::default()
-            }
-        }).collect();
+        let connects: Vec<Coord> = start
+            .connects(&pipe)
+            .into_iter()
+            .map(|c| {
+                if self.is_valid(&c) && !c.is_default() {
+                    c
+                } else {
+                    Coord::default()
+                }
+            })
+            .collect();
         connects
     }
 
@@ -158,10 +186,14 @@ impl Map {
         let mut starts = self.next(&self.start);
         marks.loop_vec.insert(self.start.clone());
 
-        while starts.len() > 0 {
+        while !starts.is_empty() {
             let mut new_starts: Vec<Coord> = vec![];
             for sc in starts {
-                let sc_next = self.next(&sc).into_iter().filter(|n| !marks.loop_vec.contains(n)).collect::<Vec<Coord>>();
+                let sc_next = self
+                    .next(&sc)
+                    .into_iter()
+                    .filter(|n| !marks.loop_vec.contains(n))
+                    .collect::<Vec<Coord>>();
                 for sc_entry in sc_next.iter() {
                     marks.loop_vec.insert(sc_entry.clone());
                     new_starts.push(sc_entry.clone());
@@ -177,7 +209,7 @@ impl Map {
     fn expand_map(&self) -> Map {
         let mut new_map = Map {
             data: vec![],
-            start: Coord::new(self.start.y*2, self.start.x*2),
+            start: Coord::new(self.start.y * 2, self.start.x * 2),
             orig: HashSet::new(),
         };
 
@@ -195,10 +227,10 @@ impl Map {
                     Pipe::START => vec![Pipe::START, Pipe::START],
                 };
 
-                let c = Coord::new(2*ridx as isize, 2*cidx as isize);
+                let c = Coord::new(2 * ridx as isize, 2 * cidx as isize);
                 new_map.orig.insert(c);
 
-                if new_row0.len() > 0 {
+                if !new_row0.is_empty() {
                     if let Some(last) = new_row0.last_mut() {
                         if last == &Pipe::START {
                             *last = match column {
@@ -218,7 +250,6 @@ impl Map {
                 new_row0.extend(ext);
             }
 
-
             let mut new_row1: Vec<Pipe> = vec![];
             for (cidx, column) in new_row0.iter().enumerate() {
                 let ext = match column {
@@ -232,7 +263,7 @@ impl Map {
                     Pipe::START => Pipe::START,
                 };
 
-                if new_map.data.len() != 0 {
+                if !new_map.data.is_empty() {
                     let ridx = new_map.data.len() - 1;
                     let prev = new_map.data.get_mut(ridx).unwrap().get_mut(cidx).unwrap();
                     if prev == &Pipe::START {
@@ -311,25 +342,25 @@ impl Marks {
             let mut escaped = false;
 
             let mut check_next: Vec<Coord> = vec![start.clone()];
-            while check_next.len() > 0 {
+            while !check_next.is_empty() {
                 let mut new_check_next: Vec<Coord> = vec![];
                 for start in &check_next {
                     if neigh_map.contains(start) || self.loop_vec.contains(start) {
-                        continue
+                        continue;
                     }
 
                     neigh_map.insert(start.clone());
 
-                    for y in (start.y-1)..=(start.y+1) {
-                        for x in (start.x-1)..=(start.x+1) {
+                    for y in (start.y - 1)..=(start.y + 1) {
+                        for x in (start.x - 1)..=(start.x + 1) {
                             let c = Coord::new(y, x);
                             if !map.is_valid(&c) {
                                 escaped = true;
-                                continue
+                                continue;
                             }
 
                             if neigh_map.contains(&c) {
-                                continue
+                                continue;
                             }
 
                             if self.non_loop.contains(&c) {
@@ -351,7 +382,6 @@ impl Marks {
                     }
                 }
             }
-
         }
 
         enclosed
@@ -366,14 +396,17 @@ impl Solution {
     pub fn build(config: &Config) -> Solution {
         let mut sol = Solution {
             map: Map {
-                data: config.content.lines().map(|line| Map::parse_line(line)).collect::<Vec<Vec<Pipe>>>(),
+                data: config
+                    .content
+                    .lines()
+                    .map(Map::parse_line)
+                    .collect::<Vec<Vec<Pipe>>>(),
                 start: Coord::default(),
                 orig: HashSet::new(),
             },
         };
 
         sol.map.find_start();
-
         sol
     }
 
