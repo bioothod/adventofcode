@@ -86,7 +86,7 @@ struct Record {
 
 impl Record {
     fn parse(line: &str, stage: Stage) -> Record {
-        let mult = 2;
+        let mult = 5;
 
         let spl = line.split_whitespace().collect::<Vec<&str>>();
         let mask_string = if stage == Stage::ONE {
@@ -147,8 +147,6 @@ impl Record {
 
     fn match_regions(&mut self) -> usize {
         let mut matches = 0;
-        let mut last_operational = 0;
-        let mut start_operational = 0;
 
         while !self.gens[0].done() {
             let mut var = self.mask.clone();
@@ -158,27 +156,38 @@ impl Record {
             let mut mask_idx = 0;
 
             while mask_idx < self.mask.len() && !self.gens[0].done() {
-                let mask_value = if self.mask[mask_idx] == UNKNOWN {
-                    let Some(value) = self.gens[gidx].get() else {
-                        break;
+                loop {
+                    let mask_value = if self.mask[mask_idx] == UNKNOWN {
+                        let Some(value) = self.gens[gidx].get() else {
+                            break;
+                        };
+                        gidx += 1;
+                        value
+                    } else {
+                        self.mask[mask_idx]
                     };
-                    gidx += 1;
-                    value
-                } else {
-                    self.mask[mask_idx]
-                };
 
-                if mask_value == DAMAGED {
-                    if (mask_idx == 0) || (var[mask_idx - 1] != DAMAGED) {
-                        damaged_regions.push(0);
+                    if mask_value == DAMAGED {
+                        if (mask_idx == 0) || (var[mask_idx - 1] != DAMAGED) {
+                            damaged_regions.push(0);
+                        }
+
+                        *damaged_regions.last_mut().unwrap() += 1;
+
+                        if damaged_regions.len() > self.broken_regions.len() {
+                            break;
+                        }
+
+                        let required = self.broken_regions[damaged_regions.len() - 1];
+                        if damaged_regions.last().unwrap() == &required {
+                            break;
+                        }
                     }
 
-                    *damaged_regions.last_mut().unwrap() += 1;
+                    var[mask_idx] = mask_value;
+
+                    damaged_regions_cache.insert(mask_idx, damaged_regions.clone());
                 }
-
-                var[mask_idx] = mask_value;
-
-                damaged_regions_cache.insert(mask_idx, damaged_regions.clone());
 
                 let precise_check = (mask_value != DAMAGED) || (mask_idx == self.mask.len() - 1);
                 let region_matches = self.current_region_matches(
@@ -211,12 +220,6 @@ impl Record {
 
                 if region_matches {
                     if mask_idx == self.mask.len() - 1 {
-                        if var.last().unwrap() == &OPERATIONAL {
-                            last_operational += 1;
-                        }
-                        if var[0] == OPERATIONAL {
-                            start_operational += 1;
-                        }
                         matches += 1;
                     }
                 }
@@ -247,8 +250,6 @@ impl Record {
             vec_to_string(&self.mask),
             self.broken_regions,
             matches,
-            start_operational,
-            last_operational
         );
         matches
     }
