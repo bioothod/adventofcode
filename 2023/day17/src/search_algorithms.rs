@@ -1,4 +1,3 @@
-
 fn min_distance(&self, start: &Position, end: &Position) -> usize {
     let y = if start.y > end.y {
         start.y - end.y
@@ -235,18 +234,4 @@ fn find_path_dijkstra(&self, max_steps: usize) -> usize {
         println!("{}   {}", ws, ps);
     }
     weights.iter().sum()
-}
-
-fn check_loop(&self, end: &Position, path: &HashMap<Position, Position>) -> bool {
-    let mut node = end;
-    loop {
-        let Some(parent) = path.get(&node) else {
-            return false;
-        };
-        if parent == end {
-            return true;
-        }
-
-        node = parent;
-    }
 }
