@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::config::Config;
+use crate::config::Stage;
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct Position {
@@ -115,6 +116,7 @@ pub struct Solution {
     map: HashMap<Position, Block>,
     ysize: isize,
     xsize: isize,
+    stage: Stage,
 }
 
 impl Solution {
@@ -135,6 +137,7 @@ impl Solution {
             ),
             ysize: lines.len() as isize,
             xsize: lines[0].len() as isize,
+            stage: config.stage.clone(),
         };
 
         sol
@@ -277,7 +280,7 @@ impl Solution {
                         new_mv.dist = alt;
 
                         steps_made.insert(new_mv.clone(), prev_mv.clone());
-                        if i >= min_steps {
+                        if self.stage == Stage::ONE || i >= min_steps {
                             open_list.push(new_mv.clone());
                         }
 
