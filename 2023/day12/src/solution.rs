@@ -1,6 +1,8 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
+use std::hash::{Hash, Hasher};
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 
@@ -48,43 +50,36 @@ impl RecordType {
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 struct Region {
     start: usize,
+    start_orig: usize,
     size: usize,
-    skip: bool,
 }
 
 impl fmt::Debug for Region {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let type_char = if self.skip { "." } else { "#" };
-        write!(
-            f,
-            "[{},{} {})",
-            self.start,
-            self.start + self.size,
-            type_char
-        )
+        write!(f, "[{},{})", self.start, self.start + self.size,)
     }
 }
 
 impl Region {
-    fn new(start: usize, size: usize, skip: bool) -> Region {
-        Region { start, size, skip }
+    fn new(start: usize, size: usize) -> Region {
+        Region {
+            start,
+            start_orig: 0,
+            size,
+        }
     }
-}
-
-fn regions_to_string(regions: &Vec<Region>) -> String {
-    let region_strings = regions.iter().fold(vec![], |acc, r| {
-        let fill_char = if r.skip { "." } else { "#" };
-        let mut rstr = vec![fill_char; r.size];
-        rstr.extend(acc);
-        rstr
-    });
-    String::from_iter(region_strings.into_iter().rev())
 }
 
 #[derive(Clone)]
 struct Record {
     mask: Vec<RecordType>,
     broken_regions: Vec<usize>,
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
+struct State {
+    start: usize,
+    idx: usize,
 }
 
 impl Record {
@@ -110,11 +105,6 @@ impl Record {
             .split(",")
             .map(|subl| subl.parse::<usize>().unwrap())
             .collect();
-        let unknown_positions = mask
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &c)| if c == UNKNOWN { Some(i) } else { None })
-            .collect::<Vec<usize>>();
 
         Record {
             mask,
@@ -122,16 +112,58 @@ impl Record {
         }
     }
 
-    fn find_damaged_region(&self, start_idx: usize, region_size: usize) -> Option<usize> {
-        let mut start_idx = start_idx;
+    fn regions_to_string(&self, regions: &Vec<Region>) -> String {
+        let mut output: Vec<char> = self
+            .mask
+            .iter()
+            .map(|r| match r {
+                UNKNOWN => '?',
+                DAMAGED => '#',
+                OPERATIONAL => '.',
+            })
+            .collect();
+
+        for r in regions.iter() {
+            for i in r.start..(r.start + r.size) {
+                output[i] = 'R';
+            }
+        }
+
+        String::from_iter(output.into_iter())
+    }
+
+    fn find_damaged_region(&self, start_idx_orig: usize, region_size: usize) -> Option<usize> {
+        let mut start_idx = start_idx_orig;
+
+        if start_idx + region_size > self.mask.len() {
+            return None;
+        }
+
+        if start_idx > 0 {
+            if self.mask[start_idx - 1] == DAMAGED {
+                return None;
+            }
+        }
+
         while start_idx + region_size <= self.mask.len() {
             let mask = &self.mask[start_idx..(start_idx + region_size)];
             let matching_region_size = mask.into_iter().filter(|&c| c != &OPERATIONAL).count();
 
             if matching_region_size == region_size {
-                return Some(start_idx);
+                if start_idx + region_size == self.mask.len()
+                    || self.mask[start_idx + region_size] != DAMAGED
+                {
+                    // println!("find_damaged_region: start_idx: {} -> {}, region_size: {}, start+size: {}/{}, after region: {:?}",
+                    //          start_idx_orig, start_idx, region_size, start_idx+region_size, self.mask.len(),
+                    //          if start_idx + region_size < self.mask.len() {self.mask[start_idx+region_size].to_char()}else {'E'}
+
+                    // );
+                    return Some(start_idx);
+                }
             }
 
+            // we could not match the whole @region_size, but the region starts with the DAMAGED entry,
+            // which means we already have a DAMAGED region which has incorrect size
             if self.mask[start_idx] == DAMAGED {
                 return None;
             }
@@ -142,152 +174,132 @@ impl Record {
         None
     }
 
-    fn find_skip_region(
-        &self,
-        regions: &mut Vec<Region>,
-        start_idx: usize,
-        cache: &HashSet<Vec<Region>>,
-    ) -> Option<usize> {
-        let mut idx = start_idx;
+    fn match_regions(&mut self, match_regions_call_idx: usize) -> usize {
+        let mut matches = 0;
+        let mut gens: Vec<Region> = self
+            .broken_regions
+            .iter()
+            .map(|r| Region::new(0, *r))
+            .collect();
+        let mut broken_region_idx = 0;
+        let mut broken_region_start = 0;
+        let mut cache: HashMap<State, (usize, usize)> = HashMap::new();
+        let mut needs_update: HashSet<State> = HashSet::new();
+
+        let rest_is_operational = |start| {
+            if start >= self.mask.len() {
+                return true;
+            }
+
+            (start..self.mask.len())
+                .filter(|&idx| self.mask[idx] != DAMAGED)
+                .count()
+                == (self.mask.len() - start)
+        };
 
         loop {
-            if self.mask[idx] == DAMAGED {
-                return None;
-            }
-
-            idx += 1;
-            if idx == self.mask.len() {
-                return None;
-            }
-
-            if idx == start_idx + 1 {
-                regions.push(Region::new(start_idx, idx - start_idx, true));
+            let mut skip = false;
+            let last_g = gens.get_mut(broken_region_idx).unwrap();
+            let key = State {
+                start: last_g.start_orig,
+                idx: broken_region_idx,
+            };
+            if !cache.contains_key(&key) {
+                cache.insert(key.clone(), (matches, 0));
+                needs_update.insert(key);
             } else {
-                *regions.last_mut().unwrap() = Region::new(start_idx, idx - start_idx, true);
+                let cached = cache.get(&key).unwrap();
+                skip = true;
+
+                last_g.start = cached.1;
+                matches += cached.0;
+                broken_region_idx += 1;
             }
 
-            if !cache.contains(regions) {
+            if !skip {
+                let mut all_is_good = false;
+                while broken_region_idx < self.broken_regions.len() {
+                    all_is_good = false;
+
+                    let g = gens.get_mut(broken_region_idx).unwrap();
+                    if g.start == 0 {
+                        g.start = broken_region_start;
+                    }
+
+                    broken_region_idx += 1;
+                    let Some(start_idx) = self.find_damaged_region(g.start, g.size) else {
+                        break;
+                    };
+
+                    g.start = start_idx;
+
+                    broken_region_start = g.start + g.size + 1;
+
+                    all_is_good = true;
+                    if broken_region_start >= self.mask.len() {
+                        break;
+                    }
+                }
+
+                if broken_region_idx == self.broken_regions.len() && all_is_good {
+                    if rest_is_operational(broken_region_start) {
+                        matches += 1;
+                    }
+                }
+
+                if broken_region_idx == 0 {
+                    break;
+                }
+            }
+            let mut updated = false;
+
+            while broken_region_idx > 0 {
+                broken_region_idx -= 1;
+
+                let last_g = gens.get_mut(broken_region_idx).unwrap();
+                let key = State {
+                    start: last_g.start_orig,
+                    idx: broken_region_idx,
+                };
+
+                if needs_update.contains(&key) {
+                    needs_update.remove(&key);
+
+                    let cached = cache.get_mut(&key).unwrap();
+                    cached.0 = matches - cached.0;
+                    cached.1 = last_g.start;
+                }
+
+                if self.mask[last_g.start] == DAMAGED {
+                    continue;
+                }
+
+                last_g.start += 1;
+                last_g.start_orig = last_g.start;
+
+                if last_g.start == self.mask.len() {
+                    continue;
+                }
+                for g in gens[(broken_region_idx + 1)..self.broken_regions.len()].iter_mut() {
+                    g.start = 0;
+                }
+                updated = true;
+                break;
+            }
+
+            if !updated {
                 break;
             }
         }
 
-        return Some(idx);
-    }
-
-    fn match_regions(&mut self) -> usize {
-        let mut matches = 0;
-        let mut cache: HashSet<Vec<Region>> = HashSet::new();
-        let mut reset = false;
-
-        while !reset {
-            let mut write_idx = 0;
-            let mut damaged_regions: Vec<usize> = vec![];
-            let mut regions: Vec<Region> = vec![];
-            let mut broken_regions_idx_start = 0;
-
-            println!(
-                "start: {:?} {:?} cache: {}",
-                vec_to_string(&self.mask),
-                self.broken_regions,
-                cache.capacity()
-            );
-
-            while !reset {
-                for (broken_region_idx, r) in self.broken_regions
-                    [broken_regions_idx_start..self.broken_regions.len()]
-                    .iter()
-                    .enumerate()
-                {
-                    if let Some(last) = regions.last() {
-                        if !last.skip
-                    let Some(start_idx) = self.find_damaged_region(write_idx, *r) else {
-                        println!(
-                        "{:?}: broken_regions: {:?}, broken_region_idx: {}, r: {}: could not find damaged region",
-                        regions_to_string(&regions),
-                        self.broken_regions, broken_region_idx, r
-                    );
-
-                        if broken_region_idx == 0 {
-                            reset = true;
-                        }
-
-                        break;
-                    };
-                    if start_idx != write_idx {
-                        regions.push(Region::new(write_idx, start_idx - write_idx, true));
-                    }
-                    regions.push(Region::new(start_idx, *r, false));
-
-                    damaged_regions.push(*r);
-
-                    println!(
-                        "{:?}: damaged_regions: {:?}/{:?} [{}], write_idx: {} -> {}",
-                        regions_to_string(&regions),
-                        damaged_regions,
-                        self.broken_regions,
-                        if damaged_regions == self.broken_regions {
-                            "+"
-                        } else {
-                            "-"
-                        },
-                        write_idx,
-                        start_idx + r,
-                    );
-
-                    write_idx = start_idx + r;
-
-                    if damaged_regions.len() == self.broken_regions.len() {
-                        let rest_is_operational = self.mask[write_idx..self.mask.len()]
-                            .iter()
-                            .all(|&c| c != DAMAGED);
-                        if rest_is_operational {
-                            println!("{:?}: found match", regions_to_string(&regions));
-                            matches += 1;
-                        }
-
-                        cache.insert(regions.clone());
-                        break;
-                    }
-
-                    let Some(skip_idx) = self.find_skip_region(&mut regions, write_idx, &cache)
-                    else {
-                        println!(
-                            "{:?}: regions: {:?}, broken_regions: {:?}, write_idx: {}: could not find a skip region",
-                            regions_to_string(&regions),
-                            regions, self.broken_regions, write_idx
-                        );
-                        break;
-                    };
-
-                    cache.insert(regions.clone());
-                    write_idx = skip_idx;
-                }
-
-                if let Some(last) = regions.pop() {
-                    if !last.skip {
-                        damaged_regions.pop();
-                        broken_regions_idx_start = damaged_regions.len();
-                        println!(
-                            "{:?}: removed last: {:?}, write_idx: {} -> {}",
-                            regions_to_string(&regions),
-                            last,
-                            write_idx,
-                            write_idx - last.size
-                        );
-                    }
-                    write_idx -= last.size;
-                } else {
-                    break;
-                }
-            }
-        }
-
         println!(
-            "region done: {:?} {:?} -> {}",
+            "{}: end: {:?}, broken_regions: {:?}, matches: {}",
+            match_regions_call_idx,
             vec_to_string(&self.mask),
             self.broken_regions,
-            matches,
+            matches
         );
+
         matches
     }
 }
@@ -310,7 +322,11 @@ impl Solution {
     }
 
     pub fn stage1(&mut self) -> usize {
-        self.records.iter_mut().map(|r| r.match_regions()).sum()
+        self.records
+            .iter_mut()
+            .enumerate()
+            .map(|(idx, r)| r.match_regions(idx))
+            .sum()
     }
 
     pub fn stage2(&mut self) -> usize {
@@ -319,17 +335,21 @@ impl Solution {
         let pool = ThreadPool::new(n_workers);
 
         let (tx, rx) = channel();
-        for r in self.records.iter() {
+        for (idx, r) in self.records.iter().enumerate() {
             let tx = tx.clone();
             let mut r = r.clone();
             pool.execute(move || {
-                let num = r.match_regions();
+                let num = r.match_regions(idx);
                 tx.send(num).expect("channel not closed");
             });
         }
         rx.iter().take(n_jobs).sum()
     }
     pub fn stage21(&mut self) -> usize {
-        self.records.iter_mut().map(|r| r.match_regions()).sum()
+        self.records
+            .iter_mut()
+            .enumerate()
+            .map(|(idx, r)| r.match_regions(idx))
+            .sum()
     }
 }
