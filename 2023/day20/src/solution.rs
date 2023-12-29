@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
 use std::collections::HashMap;
-
-use itertools::Itertools;
+use std::collections::HashSet;
 
 use crate::config::Config;
 use crate::config::Stage;
+use crate::numbers;
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash, PartialOrd, Ord)]
 enum Pulse {
@@ -22,9 +21,9 @@ trait Module {
     fn name(&self) -> String;
     fn dst(&self) -> Vec<String>;
     fn set_inputs(&mut self, _inputs: &Vec<String>) {}
-    fn process(&mut self, inputs: BTreeMap<String, Pulse>) -> BTreeMap<String, Pulse>;
-    fn received(&self) -> BTreeMap<Pulse, usize> {
-        BTreeMap::new()
+    fn process(&mut self, inputs: HashMap<String, Pulse>) -> HashMap<String, Pulse>;
+    fn received(&self) -> HashMap<Pulse, usize> {
+        HashMap::new()
     }
 }
 
@@ -52,14 +51,14 @@ impl Module for FlipFlop {
     fn dst(&self) -> Vec<String> {
         self.dst.clone()
     }
-    fn process(&mut self, input: BTreeMap<String, Pulse>) -> BTreeMap<String, Pulse> {
+    fn process(&mut self, input: HashMap<String, Pulse>) -> HashMap<String, Pulse> {
         if input.len() != 1 {
             panic!("flipflop module received multiple inputs {}", input.len());
         }
 
         let input = input.values().nth(0).unwrap();
         if input == &Pulse::HIGH {
-            return BTreeMap::new();
+            return HashMap::new();
         }
 
         let ret_pulse = if self.state == State::OFF {
@@ -84,7 +83,8 @@ struct Conjunction {
     inputs: Vec<String>,
     num_inputs: usize,
     remembers: Pulse,
-    last_inputs: BTreeMap<String, Pulse>,
+    last_inputs: HashMap<String, Pulse>,
+    received: HashMap<Pulse, usize>,
 }
 
 impl Conjunction {
@@ -95,7 +95,8 @@ impl Conjunction {
             remembers: Pulse::LOW,
             inputs: vec![],
             num_inputs: 0,
-            last_inputs: BTreeMap::new(),
+            last_inputs: HashMap::new(),
+            received: HashMap::new(),
         }
     }
 }
@@ -107,9 +108,15 @@ impl Module for Conjunction {
     fn dst(&self) -> Vec<String> {
         self.dst.clone()
     }
-    fn process(&mut self, input: BTreeMap<String, Pulse>) -> BTreeMap<String, Pulse> {
+    fn process(&mut self, input: HashMap<String, Pulse>) -> HashMap<String, Pulse> {
+        for pulse in input.values() {
+            self.received
+                .entry(pulse.clone())
+                .and_modify(|ent| *ent += 1)
+                .or_insert(1);
+        }
+
         let _ = input
-            .clone()
             .into_iter()
             .map(|(key, value)| {
                 self.last_inputs.insert(key, value);
@@ -135,6 +142,9 @@ impl Module for Conjunction {
             })
             .count();
     }
+    fn received(&self) -> HashMap<Pulse, usize> {
+        self.received.clone()
+    }
 }
 
 struct Broadcaster {
@@ -154,7 +164,7 @@ impl Module for Broadcaster {
     fn dst(&self) -> Vec<String> {
         self.dst.clone()
     }
-    fn process(&mut self, input: BTreeMap<String, Pulse>) -> BTreeMap<String, Pulse> {
+    fn process(&mut self, input: HashMap<String, Pulse>) -> HashMap<String, Pulse> {
         if input.len() != 1 {
             panic!(
                 "broadcaster module received multiple inputs {}",
@@ -164,7 +174,7 @@ impl Module for Broadcaster {
 
         let input = input.values().nth(0).unwrap();
         if input == &Pulse::HIGH {
-            return BTreeMap::new();
+            return HashMap::new();
         }
 
         self.dst
@@ -191,7 +201,7 @@ impl Module for Button {
     fn dst(&self) -> Vec<String> {
         self.dst.clone()
     }
-    fn process(&mut self, _input: BTreeMap<String, Pulse>) -> BTreeMap<String, Pulse> {
+    fn process(&mut self, _input: HashMap<String, Pulse>) -> HashMap<String, Pulse> {
         self.dst
             .iter()
             .map(|name| (name.clone(), Pulse::LOW))
@@ -202,14 +212,14 @@ impl Module for Button {
 struct Output {
     name: String,
     dst: Vec<String>,
-    received: BTreeMap<Pulse, usize>,
+    received: HashMap<Pulse, usize>,
 }
 impl Output {
     fn new(name: String, _dst: Vec<String>) -> Output {
         Output {
             name,
             dst: vec![],
-            received: BTreeMap::new(),
+            received: HashMap::new(),
         }
     }
 }
@@ -221,21 +231,23 @@ impl Module for Output {
     fn dst(&self) -> Vec<String> {
         self.dst.clone()
     }
-    fn process(&mut self, input: BTreeMap<String, Pulse>) -> BTreeMap<String, Pulse> {
+    fn process(&mut self, input: HashMap<String, Pulse>) -> HashMap<String, Pulse> {
         for pulse in input.values() {
             self.received
                 .entry(pulse.clone())
-                .and_modify(|ent| *ent += 1);
+                .and_modify(|ent| *ent += 1)
+                .or_insert(1);
         }
-        BTreeMap::new()
+        HashMap::new()
     }
-    fn received(&self) -> BTreeMap<Pulse, usize> {
+    fn received(&self) -> HashMap<Pulse, usize> {
         self.received.clone()
     }
 }
 
 pub struct Solution {
-    modules: BTreeMap<String, Box<dyn Module>>,
+    modules: HashMap<String, Box<dyn Module>>,
+    stage: Stage,
 }
 
 impl Solution {
@@ -279,6 +291,7 @@ impl Solution {
                 })
                 .map(|m| (m.name().clone(), m))
                 .collect(),
+            stage: config.stage.clone(),
         };
 
         sol.modules.insert(
@@ -289,7 +302,7 @@ impl Solution {
             )),
         );
 
-        let mut all_inputs: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut all_inputs: HashMap<String, Vec<String>> = HashMap::new();
         let _ = sol
             .modules
             .values()
@@ -315,12 +328,12 @@ impl Solution {
         sol
     }
 
-    pub fn stage1(&mut self) -> usize {
-        let mut impulse_counts: BTreeMap<Pulse, usize> = BTreeMap::new();
-        let mut count_impulses = |impulses: &Vec<(String, BTreeMap<String, Pulse>)>| {
+    pub fn count_pulses(&mut self, max_pulses: usize) -> usize {
+        let mut impulse_counts: HashMap<Pulse, usize> = HashMap::new();
+        let mut count_impulses = |impulses: &Vec<(String, HashMap<String, Pulse>)>| {
             let _ = impulses
                 .iter()
-                .map(|(src_name, pulses)| {
+                .map(|(_src_name, pulses)| {
                     pulses
                         .values()
                         .map(|imp| *impulse_counts.entry(imp.clone()).or_insert(0) += 1)
@@ -329,23 +342,24 @@ impl Solution {
                 .collect::<Vec<_>>();
         };
 
-        loop {
+        let interesting_conj = HashSet::from(["vq", "sn", "rf", "sr"]);
+        let mut checked_conj: HashMap<&str, usize> = HashMap::new();
+        for i in 1..=max_pulses {
             let button = self.modules.get_mut("button").unwrap();
-            let mut impulses: Vec<(String, BTreeMap<String, Pulse>)> =
-                vec![(button.name().clone(), button.process(BTreeMap::new()))];
+            let mut impulses: Vec<(String, HashMap<String, Pulse>)> =
+                vec![(button.name().clone(), button.process(HashMap::new()))];
             count_impulses(&impulses);
 
             while impulses.len() != 0 {
                 //println!("{}: impulses: {:?}", i, impulses);
-                let mut next_inputs: Vec<(String, BTreeMap<String, Pulse>)> = vec![];
+                let mut next_inputs: Vec<(String, HashMap<String, Pulse>)> = vec![];
 
                 for (src_name, module_output_impulse) in impulses.iter() {
                     for (name, pulse) in module_output_impulse.iter() {
                         let module = self.modules.get_mut(name).unwrap();
-                        let module_input: BTreeMap<String, Pulse> =
-                            BTreeMap::from([(src_name.clone(), pulse.clone())]);
+                        let module_input: HashMap<String, Pulse> =
+                            HashMap::from([(src_name.clone(), pulse.clone())]);
                         let outputs = module.process(module_input.clone());
-                        //println!("{}: {:?} -> {:?}", name, module_input, outputs);
                         next_inputs.push((name.clone(), outputs));
                     }
                 }
@@ -354,18 +368,38 @@ impl Solution {
                 impulses = next_inputs;
             }
 
-            let rx = self.modules.get("rx").unwrap();
-            let received = rx.received();
-            if received.len() != 0 {
-                println!("rx: {:?}", received);
-                break;
+            if self.stage == Stage::TWO {
+                for name in interesting_conj.iter() {
+                    let m = self.modules.get(name as &str).unwrap();
+                    let received = m.received();
+                    if let Some(low) = received.get(&Pulse::LOW) {
+                        if !checked_conj.contains_key(name) {
+                            if low == &1 {
+                                //println!("{}: first low at {}: {:?}", name, i, received);
+                                checked_conj.insert(name, i);
+                            }
+                        }
+                    }
+                }
+
+                if checked_conj.len() == 4 {
+                    let mut ret = 1;
+                    for num in checked_conj.values() {
+                        ret = numbers::lcm(ret, *num);
+                    }
+
+                    return ret;
+                }
             }
         }
 
         impulse_counts[&Pulse::LOW] * impulse_counts[&Pulse::HIGH]
     }
+    pub fn stage1(&mut self) -> usize {
+        self.count_pulses(1000)
+    }
 
     pub fn stage2(&mut self) -> usize {
-        0
+        self.count_pulses(usize::MAX)
     }
 }
