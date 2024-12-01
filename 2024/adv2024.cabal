@@ -1,0 +1,50 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.37.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           adv2024
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/bioothod/adventofcode/2024>
+homepage:       https://github.com/bioothod/adventofcode#readme
+bug-reports:    https://github.com/bioothod/adventofcode/issues
+author:         Eugene Pol
+maintainer:     zbr@ioremap.net
+copyright:      Eugene Pol
+license:        GPL-3.0
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/bioothod/adventofcode
+  subdir: 2024
+
+library
+  exposed-modules:
+      Day01
+      Lib
+  other-modules:
+      Paths_adv2024
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+executable adv2024-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_adv2024
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      adv2024
+    , base >=4.7 && <5
+  default-language: GHC2021
