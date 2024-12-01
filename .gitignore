@@ -3,3 +3,11 @@ target/
 *~
 \#*\#
 \.\#*
+
+.stack-work/
+*.lock
+
+examples/
+inputs/
+
+input_small*
