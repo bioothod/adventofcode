@@ -40,13 +40,6 @@ parseEof = do
   _ <- eof
   return Dont
 
--- parseEnabledBlock :: Parser String
--- parseEnabledBlock = do
---   _ <- parseDo
---   inner <- manyTill parseDont
---   _ <- parseEof <|> parseDont
---   return inner
-
 parseEnabledBlock :: Parser String
 parseEnabledBlock = do
   _ <- parseDo
