@@ -52,9 +52,9 @@ dereference_instruction _ = error "can not dereference"
 
 parse_lines :: [String] -> Integer
 parse_lines input = do
-  let right_instructions = map (map snd) . map rights $ map (splitCap (match parseMul)) input
-  let instructions = map (map dereference_instruction) right_instructions
-  toInteger . foldl (+) 0 $ map (foldl (+) 0) instructions
+  let right_instructions = map snd . rights . concat $ map (splitCap (match parseMul)) input
+  let instructions = map dereference_instruction right_instructions
+  toInteger $ foldl (+) 0 instructions
 
 solve1 :: String -> Solution
 solve1 input = do
