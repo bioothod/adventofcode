@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Day01
+import Day03
 
 import System.Environment (getArgs)
 
