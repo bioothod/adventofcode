@@ -14,7 +14,7 @@ check_pair_decr :: (Integer, Integer) -> Bool
 check_pair_decr (a, b) = b <= a - min_step && b >= a - max_step
 
 check_pairs_acc :: [Integer] -> [Bool]
-check_pairs_acc xs = True : (map check_pair_decr . zip xs $ drop 1 xs)
+check_pairs_acc xs = map check_pair_decr . zip xs $ drop 1 xs
 
 try_and_drop :: Int -> [Integer] -> Bool
 try_and_drop x xs = let (left, right) = splitAt x xs
@@ -34,7 +34,7 @@ drop_one_and_check strict xs = let bools = check_pairs_acc xs
                                          else find_one_dropped bools xs
 
 is_safe_drop :: Bool -> [Integer] -> Bool
-is_safe_drop strict report = (drop_one_and_check strict report) || (drop_one_and_check strict  $ reverse report)
+is_safe_drop strict report = (drop_one_and_check strict report) || (drop_one_and_check strict $ reverse report)
 
 solve1 :: String -> Solution
 solve1 input = do
