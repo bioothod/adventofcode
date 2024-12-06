@@ -26,10 +26,12 @@ source-repository head
 
 library
   exposed-modules:
+      Common
       Day01
       Day02
       Day03
       Day04
+      Day05
   other-modules:
       Paths_adv2024
   hs-source-dirs:
@@ -37,6 +39,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers
     , megaparsec
     , replace-megaparsec
   default-language: Haskell2010

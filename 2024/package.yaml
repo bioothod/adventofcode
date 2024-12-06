@@ -38,6 +38,7 @@ library:
   dependencies:
         - megaparsec
         - replace-megaparsec
+        - containers
 
 
 executables:
