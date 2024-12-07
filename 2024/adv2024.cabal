@@ -32,6 +32,7 @@ library
       Day03
       Day04
       Day05
+      Day06
   other-modules:
       Paths_adv2024
   hs-source-dirs:
