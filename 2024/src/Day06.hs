@@ -171,21 +171,15 @@ solve1 input = do
   let (s, _) = guardRun Set.empty Set.empty nmx nmy g
   Set.size s
 
-oneRunCycle :: Int -> Int -> Point -> [Point] -> Bool
-oneRunCycle maxGuardX maxGuardY obs points = do
-  -- could be optimized to only insert points into already filled maps
-  let new_points = obs:points
-  let (mx, my, g) = foldl updateMaps (Map.empty, Map.empty, Empty (Coord 0 0)) new_points
+insertAndScan :: Int -> [Point] -> [Point] -> [Point]
+insertAndScan _ new_value old_value = sortBy sortFunction (new_value ++ old_value)
 
-  let guardKeysX = [0..maxGuardX]
-  let mx1 = coordMapInsertGuard mx guardKeysX (map (\x -> Exit (Coord x 0)) guardKeysX)
-  let nmx = sortMapKeys $ coordMapInsertGuard mx1 guardKeysX (map (\x -> Exit (Coord x maxGuardY)) guardKeysX)
+oneRunCycle :: MapType -> MapType -> Point -> Point -> Bool
+oneRunCycle nmx nmy g obs = do
 
-  let guardKeysY = [0..maxGuardY]
-  let my1 = coordMapInsertGuard my guardKeysY (map (\y -> Exit (Coord 0 y)) guardKeysY)
-  let nmy = sortMapKeys $ coordMapInsertGuard my1 guardKeysY (map (\y -> Exit (Coord maxGuardX y)) guardKeysY)
-
-  let (_, isCycle) = guardRun Set.empty Set.empty nmx nmy g
+  let nmx1 = Map.insertWithKey insertAndScan (coordX obs) [obs] nmx
+  let nmy1 = Map.insertWithKey insertAndScan (coordY obs) [obs] nmy
+  let (_, isCycle) = guardRun Set.empty Set.empty nmx1 nmy1 g
   isCycle
 
 solve2 :: String -> Solution
@@ -197,6 +191,18 @@ solve2 input = do
 
   let all_points = concat $ zipWith parseInput [1..] char_map
   let points = filter (not . isEmpty) all_points
-  let empty = filter isEmpty all_points
 
-  length . filter (==True) $ map (\p -> oneRunCycle maxGuardX maxGuardY (Obstacle (coordinates p)) points) empty
+  let (mx, my, g) = foldl updateMaps (Map.empty, Map.empty, Empty (Coord 0 0)) points
+
+  let guardKeysX = [0..maxGuardX]
+  let mx1 = coordMapInsertGuard mx guardKeysX (map (\x -> Exit (Coord x 0)) guardKeysX)
+  let nmx = sortMapKeys $ coordMapInsertGuard mx1 guardKeysX (map (\x -> Exit (Coord x maxGuardY)) guardKeysX)
+
+  let guardKeysY = [0..maxGuardY]
+  let my1 = coordMapInsertGuard my guardKeysY (map (\y -> Exit (Coord 0 y)) guardKeysY)
+  let nmy = sortMapKeys $ coordMapInsertGuard my1 guardKeysY (map (\y -> Exit (Coord maxGuardX y)) guardKeysY)
+
+  let (s, _) = guardRun Set.empty Set.empty nmx nmy g
+  let empty = Set.toList s
+
+  length . filter (==True) $ map (\c -> oneRunCycle nmx nmy g (Obstacle c)) empty
