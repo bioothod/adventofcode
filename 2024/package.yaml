@@ -39,6 +39,7 @@ library:
         - megaparsec
         - replace-megaparsec
         - containers
+        - vector
 
 
 executables:
