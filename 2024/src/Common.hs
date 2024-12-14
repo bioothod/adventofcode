@@ -2,6 +2,7 @@ module Common (
   wordsWhen
   , middle
   , foldl'
+  , Coord (..)
 ) where
 
 wordsWhen     :: (Char -> Bool) -> String -> [String]
@@ -16,6 +17,11 @@ middle xs = take (signum ((l + 1) `mod` 2) + 1) $ drop ((l - 1) `div ` 2) xs
 
 
 foldl' :: (t -> a -> t) -> t -> [a] -> t
-foldl' f z []     = z
+foldl' _ z []     = z
 foldl' f z (x:xs) = let z' = z `f` x
                     in seq z' $ foldl' f z' xs
+
+data Coord = Coord {
+  coordX :: Int,
+  coordY :: Int
+} deriving (Eq, Show, Ord)
