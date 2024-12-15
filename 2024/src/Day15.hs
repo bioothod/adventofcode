@@ -37,50 +37,88 @@ parseMove c = case c of
   '<' -> MoveLeft
   _ -> error ("unsupported char " ++ show c)
 
+moveObj :: (Int, Int) -> Move -> (Int, Int)
+moveObj (x, y) m = case m of
+  MoveUp -> (x, y-1)
+  MoveDown -> (x, y+1)
+  MoveLeft -> (x-1, y)
+  MoveRight -> (x+1, y)
+
+map2str :: Vmap -> [Char]
+map2str m = intercalate "\n" $ map Vector.toList $ Vector.toList m
+
 notEmpty :: Vmap -> Int -> Int -> Bool
 notEmpty wmap x y = let p = getC wmap x y
                     in p /= '.' && p /= '#'
 
-updateWmap :: Vmap -> (Int, Int) -> (Int, Int) -> (Int, Int) -> Vmap
-updateWmap wmap (sx, sy) (newSx, newSy) (dstX, dstY) = do
-  let dstRow = (wmap Vector.! dstY) Vector.// [(dstX, 'O')]
-  let dstWmap = wmap Vector.// [(dstY, dstRow)]
+markObj :: Vmap -> ObjType -> (Int, Int) -> Vmap
+markObj wmap obj (x, y) = do
+  let row = (wmap Vector.! y) Vector.// [(x, obj)]
+  wmap Vector.// [(y, row)]
 
-  let clearStartRow = (dstWmap Vector.! sy) Vector.// [(sx, '.')]
-  let clearStartWmap = dstWmap Vector.// [(sy, clearStartRow)]
+updateWmap :: Vmap -> [(Int, Int)] -> Move -> (Vmap, (Int, Int))
+updateWmap wmap positions m = do
+  let newPositions = map (flip moveObj m) positions
+  let objs = map (uncurry (getC wmap)) positions
 
-  let newStartRow = (clearStartWmap Vector.! newSy) Vector.// [(newSx, '@')]
-  let newStartWmap = clearStartWmap Vector.// [(newSy, newStartRow)]
+  let wmapClear = foldl (\acc pos -> markObj acc '.' pos) wmap positions
+  let newWmap = foldl (\acc (obj, pos) -> markObj acc obj pos) wmapClear (zip objs newPositions)
+  let newStart = head newPositions
+  (newWmap, newStart)
 
-  newStartWmap
+findObjectsToMove :: Vmap -> (Int -> Int -> Int) -> [(Int, Int)] -> (Int, Int) -> ([(Int, Int)], Bool)
+findObjectsToMove _wmap _ acc (_, 0) = (acc, False)
+findObjectsToMove _wmap _ acc (0, _) = (acc, False)
+findObjectsToMove wmap func acc start@(sx, sy) = do
+  let y = sy `func` 1
 
+  case getC wmap sx y of
+    c
+      | c == '#' -> ([], False)
+      | c == '.' -> (start:acc, True)
+      | c `elem` "O@" -> let (acc', canMove) = findObjectsToMove wmap func acc (sx, y)
+                         in if canMove
+                            then ([start]++acc'++acc, canMove)
+                            else (acc, False)
+      | c `elem` "[]" -> let (pr, pl) = case c of
+                               ']' -> ((sx, y), (sx-1, y))
+                               '[' -> ((sx+1, y), (sx, y))
+                               _ -> undefined
+
+                             (accL, canMoveL) = findObjectsToMove wmap func acc pl
+                             (accR, canMoveR) = findObjectsToMove wmap func acc pr
+                         in if canMoveL && canMoveR
+                            then ([start]++accL++accR++acc, True)
+                            else (acc, False)
+      | True -> undefined
 
 moveAll :: Vmap -> (Int, Int) -> Move -> (Vmap, (Int, Int))
-moveAll wmap (sx, sy) m = do
+moveAll wmap start@(sx, sy) m = do
   let maxX = Vector.length (wmap Vector.! 0) - 1
-  let maxY = Vector.length wmap - 1
 
-  let (newStart, dst) = case m of
-        MoveUp -> let r = takeWhile (notEmpty wmap sx) [sy, sy-1..0] in ((sx, sy-1), (sx, last r - 1))
-        MoveDown -> let r = takeWhile (notEmpty wmap sx) [sy..maxY] in ((sx, sy+1), (sx, last r + 1))
-        MoveLeft -> let r = takeWhile (\x -> notEmpty wmap x sy) [sx, sx-1..0] in ((sx-1, sy), (last r - 1, sy))
-        MoveRight -> let r = takeWhile (\x -> notEmpty wmap x sy) [sx..maxX] in ((sx+1, sy), (last r + 1, sy))
+  let (positions, canMove) = case m of
+        MoveUp -> findObjectsToMove wmap (-) [] start
+        MoveDown -> findObjectsToMove wmap (+) [] start
+        MoveLeft -> let r = takeWhile (\(x, _) -> notEmpty wmap x sy) [(x, sy) | x <- [sx, sx-1..0]]; (lx, ly) = last r in (r, getC wmap (lx-1) ly == '.')
+        MoveRight -> let r = takeWhile (\(x, _) -> notEmpty wmap x sy) [(x, sy) | x <- [sx..maxX]]; (lx, ly) = last r in (r, getC wmap (lx+1) ly == '.')
 
-  if dst == (sx, sy) || uncurry (getC wmap) dst /= '.'
+  if not canMove
     then (wmap, (sx, sy))
-    else (updateWmap wmap (sx, sy) newStart dst, newStart)
+    else updateWmap wmap positions m
 
 calcGps :: Vmap -> Int
-calcGps wmap = sum [100*y+x | (x, y) <- (,) <$> [0..maxX] <*> [0..maxY], getC wmap x y == 'O']
+calcGps wmap = sum [100*y+x | (x, y) <- (,) <$> [0..maxX] <*> [0..maxY], (getC wmap x y) `elem` "[O"]
   where maxX = Vector.length (wmap Vector.! 0) - 1
         maxY = Vector.length wmap - 1
 
+extendRow :: (Char -> String) -> String -> String
+extendRow func = concatMap func
 
-type Solution = Int
-solve1 :: String -> Solution
-solve1 input = do
+
+solveGeneric :: String -> (Char -> String) -> Int
+solveGeneric input charMapFunc = do
   let (wmapL, movesL, _) = foldl splitAtEmpty ([], [], True) $ lines input
-  let wmap = Vector.fromList $ map parseMapLine $ reverse wmapL
+  let wmap = Vector.fromList $ map parseMapLine $ map(extendRow charMapFunc) $ reverse wmapL
   let moves = map parseMove $ concat $ reverse movesL
 
   let maxX = Vector.length (wmap Vector.! 0) - 1
@@ -88,8 +126,24 @@ solve1 input = do
 
   let initialStart = head $ [(x,y) | (x, y) <- (,) <$> [0..maxX] <*> [0..maxY], getC wmap x y == '@']
   let (endWmap, _) = foldl (\(accWmap, start) move -> moveAll accWmap start move) (wmap, initialStart) moves
-  trace(intercalate "\n" (map Vector.toList $ Vector.toList endWmap)) calcGps endWmap
+  calcGps endWmap
+
+noExtension :: Char -> String
+noExtension x = [x]
+
+type Solution = Int
+solve1 :: String -> Solution
+solve1 input = do
+  solveGeneric input noExtension
+
+extChar :: Char -> String
+extChar c = case c of
+  '#' -> "##"
+  'O' -> "[]"
+  '.' -> ".."
+  '@' -> "@."
+  _ -> error ("unsupported symbol " ++ show c)
 
 solve2 :: String -> Solution
 solve2 input = do
-  2
+  solveGeneric input extChar
