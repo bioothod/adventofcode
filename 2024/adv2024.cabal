@@ -41,6 +41,8 @@ library
       Day12
       Day13
       Day14
+      Day15
+      Parser
   other-modules:
       Paths_adv2024
   hs-source-dirs:
