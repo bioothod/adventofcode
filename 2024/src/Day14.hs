@@ -1,33 +1,24 @@
 module Day14 (solve1, solve2) where
 
-import Data.Void (Void)
 import Text.Megaparsec
 import Text.Megaparsec.Char
-import Data.Maybe (fromMaybe)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Common (Coord(..))
-import Debug.Trace (trace)
+import Parser (Parser, parseInt)
+--import Debug.Trace (trace) -- to show the Christmas tree
 import Data.List (intercalate)
 
 type Solution = Int
-type Parser = Parsec Void String
-
-signParser :: Parser Int
-signParser = choice
-  [ -1 <$ char '-'
-  , 1 <$ char '+' ]
 
 parseCoord :: Parser Coord
 parseCoord = do
-  xMult <- optional signParser
-  x <- some digitChar
+  x <- parseInt
   _ <- char ','
-  yMult <- optional signParser
-  y <- some digitChar
-  return (Coord ((read x) * fromMaybe 1 xMult) ((read y) * fromMaybe 1 yMult))
+  y <- parseInt
+  return (Coord x y)
 
 data Robot = Robot {
   coords :: Coord,
@@ -105,7 +96,7 @@ hasRow robots rnum = do
   (not.null) $ dropWhile (\(Robot c _) -> not $ partOfSomething cmap rnum c) robots
 
 moveRobots :: Limit -> Int -> [Robot] -> [Robot]
-moveRobots maxC steps robots = map (makeStep maxC steps) robots
+moveRobots maxC steps = map (makeStep maxC steps)
 
 solve2 :: String -> Solution
 solve2 input = do
@@ -113,4 +104,5 @@ solve2 input = do
   let maxC = Coord 101 103
   let rnum = 8 -- selected by hands by watching shorter length matches
   let ((movedRobots, steps), _) = head $ dropWhile (not.snd) $ map (\numSteps -> let r = moveRobots maxC numSteps robots in ((r, numSteps), hasRow r rnum)) [0..]
-  trace(showRobots movedRobots maxC) steps
+  --trace(showRobots movedRobots maxC) steps
+  steps

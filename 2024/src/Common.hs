@@ -2,7 +2,7 @@ module Common (
   wordsWhen
   , middle
   , foldl'
-  , Coord (..)
+  , Coord(..)
 ) where
 
 wordsWhen     :: (Char -> Bool) -> String -> [String]
