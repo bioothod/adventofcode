@@ -13,7 +13,7 @@ type WallsMap = Set Coord
 
 type AccumulatorTuple = (EmptyMap, WallsMap, Coord, Coord)
 
-data Direction = North | West | South | East deriving (Show, Eq, Ord)
+data Direction = North | West | South | East deriving (Show, Eq, Ord, Enum)
 
 insertCoord :: AccumulatorTuple -> Coord -> Char -> AccumulatorTuple
 insertCoord (eset, wset, s, e) coord char
@@ -93,7 +93,7 @@ solve1 input = do
 
 findMinAndStep :: ScoreMap -> Int -> EmptyMap -> Coord -> Coord -> EmptyMap
 findMinAndStep scoreMap currentScore nodeMap pos start = do
-  let dirScoreListMaybe = filter (\(_, x) -> isJust x) $ map (\dest-> (dest, Map.lookup (pos, dest) scoreMap)) [North, South, East, West]
+  let dirScoreListMaybe = filter (\(_, x) -> isJust x) $ map (\dest-> (dest, Map.lookup (pos, dest) scoreMap)) [North ..]
   let dirScoreListAll = filter (\(_, x) -> x == currentScore || x == currentScore-1000) $ map (\(sc, Just x) -> (sc, x)) dirScoreListMaybe
   let dirScoreList = map (\(dir, score) -> if score == currentScore then (dir, currentScore) else (dir, currentScore-1000)) dirScoreListAll
 
