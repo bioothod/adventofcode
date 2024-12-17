@@ -5,7 +5,7 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Common (Coord(..), foldl')
+import Common (Coord(..))
 import Data.Maybe (isJust, fromMaybe)
 
 type EmptyMap = Set Coord
@@ -80,14 +80,14 @@ makeOneStep aTuple@(eSet, _, _, end) (scoreMap, bestScore) currentScore pos dir 
     then (scoreMap, bestScore)
     else if pos == end || null nextSteps
          then (scoreMap', min bestScore currentScore)
-         else foldl' (\scoreAcc (action, nextPos, nextDir) ->
+         else foldl (\scoreAcc (action, nextPos, nextDir) ->
                         makeOneStep aTuple scoreAcc (currentScore+scoreAction action) nextPos nextDir)
               (scoreMap', bestScore) nextSteps
 
 type Solution = Int
 solve1 :: String -> Solution
 solve1 input = do
-  let aTuple@(_, _, start, _end) = foldl' (\acc (y, row) -> parseLine acc y row) (Set.empty, Set.empty, Coord 0 0, Coord 0 0) (zip [0..] (lines input))
+  let aTuple@(_, _, start, _end) = foldl (\acc (y, row) -> parseLine acc y row) (Set.empty, Set.empty, Coord 0 0, Coord 0 0) (zip [0..] (lines input))
   let (_, bestScore) = makeOneStep aTuple (Map.empty, maxBound) 0 start East
   bestScore
 
@@ -105,6 +105,6 @@ findMinAndStep scoreMap currentScore nodeMap pos start = do
 
 solve2 :: String -> Solution
 solve2 input = do
-  let aTuple@(_, _, start, end) = foldl' (\acc (y, row) -> parseLine acc y row) (Set.empty, Set.empty, Coord 0 0, Coord 0 0) (zip [0..] (lines input))
+  let aTuple@(_, _, start, end) = foldl (\acc (y, row) -> parseLine acc y row) (Set.empty, Set.empty, Coord 0 0, Coord 0 0) (zip [0..] (lines input))
   let (scoreMap, bestScore) = makeOneStep aTuple (Map.empty, maxBound) 0 start East
   length $ findMinAndStep scoreMap bestScore Set.empty end start

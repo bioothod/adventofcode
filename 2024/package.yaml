@@ -42,7 +42,6 @@ library:
         - vector
         - linearEqSolver
 
-
 executables:
   adv2024-exe:
     main:                Main.hs
