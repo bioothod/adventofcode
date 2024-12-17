@@ -42,6 +42,7 @@ library
       Day13
       Day14
       Day15
+      Day16
       Parser
   other-modules:
       Paths_adv2024
