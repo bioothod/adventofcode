@@ -8,10 +8,9 @@ import qualified Data.Map as M
 import Common.Utils (Coord(..), wordsWhen)
 import Common.Search (aStar)
 import Debug.Trace (trace)
-import Data.List (intercalate, minimumBy)
-import Data.Foldable (Foldable(foldl'))
-import Data.Maybe (catMaybes, isJust, mapMaybe)
+import Data.List (minimumBy)
 import Data.Function (on)
+import Data.Maybe (mapMaybe)
 
 parseCoords :: String -> Coord
 parseCoords row = let ([x], [y]) = splitAt 1 $ map read $ wordsWhen (==',') row
@@ -20,10 +19,11 @@ parseCoords row = let ([x], [y]) = splitAt 1 $ map read $ wordsWhen (==',') row
 type CorruptedBlocks = Set Coord
 type Limits = (Int, Int)
 
+possibleCoords :: Coord -> [Coord]
 possibleCoords (Coord x y) = [Coord (x+1) y, Coord (x-1) y, Coord x (y+1), Coord x (y-1)]
 
 genNextSteps :: CorruptedBlocks -> Limits -> Coord -> [(Coord, Int)]
-genNextSteps corrupted (maxX, maxY) pos@(Coord x y) =
+genNextSteps corrupted (maxX, maxY) pos =
   map (\c -> (c, 1)) $
   filter (\c -> not $ S.member c corrupted) $
   filter (\(Coord cx cy) -> cx >= 0 && cx <= maxX && cy >= 0 && cy <= maxY) $
@@ -32,7 +32,7 @@ genNextSteps corrupted (maxX, maxY) pos@(Coord x y) =
 
 aStarHeuristic :: Coord -> Coord -> Int
 --aStarHeuristic (Coord fx fy) (Coord x y) = abs (fx - x) + abs (fy - y)
-aStarHeuristic (Coord fx fy) (Coord x y) = 0
+aStarHeuristic _ _ = 0
 
 searchFinish :: CorruptedBlocks -> Limits -> Coord -> Coord -> [(Coord, Int)]
 searchFinish corrupted limits start finish = aStar (genNextSteps corrupted limits) (aStarHeuristic finish) start
@@ -79,7 +79,7 @@ findNewPath lim corrupted start finish = do
   S.fromList path
 
 updateAndSearch :: Limits -> CorruptedBlocks -> [Coord] -> Set Coord -> Coord -> Coord -> Coord
-updateAndSearch lim corruptedOld [] _ start finish = error ("no more blocks")
+updateAndSearch _ _ [] _ _ _ = error "no more blocks"
 updateAndSearch lim corruptedOld (block:restBlocks) currentPath start finish = do
   let corrupted = S.insert block corruptedOld
 
