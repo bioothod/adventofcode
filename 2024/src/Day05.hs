@@ -4,7 +4,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (sortBy)
 
-import Common (wordsWhen)
+import Common.Utils (wordsWhen)
 
 type Solution = Int
 

@@ -5,8 +5,9 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Common (Coord(..))
 import Data.Maybe (isJust, fromMaybe)
+
+import Common.Utils (Coord(..))
 
 type EmptyMap = Set Coord
 type WallsMap = Set Coord

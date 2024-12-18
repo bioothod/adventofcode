@@ -6,8 +6,8 @@ import Text.Megaparsec.Char
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Common (Coord(..))
-import Parser (Parser, parseInt)
+import Common.Utils (Coord(..))
+import Common.Parsers (Parser, parseInt)
 --import Debug.Trace (trace) -- to show the Christmas tree
 import Data.List (intercalate)
 

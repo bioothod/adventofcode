@@ -34,6 +34,7 @@ ghc-options:
 - -Wredundant-constraints
 
 library:
+  default-extensions:  LambdaCase
   source-dirs: src
   dependencies:
         - megaparsec
@@ -41,6 +42,7 @@ library:
         - containers
         - vector
         - linearEqSolver
+        - psqueues
 
 executables:
   adv2024-exe:

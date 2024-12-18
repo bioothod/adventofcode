@@ -3,7 +3,7 @@ module Day11 (solve1, solve2) where
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Common (foldl')
+import Data.Foldable (foldl')
 
 type Solution = Int
 

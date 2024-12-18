@@ -3,7 +3,7 @@ module Day12 (solve1, solve2) where
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
-import Common (foldl')
+import Data.Foldable (foldl')
 import Data.Maybe (catMaybes, fromMaybe)
 
 data Coord = Coord {

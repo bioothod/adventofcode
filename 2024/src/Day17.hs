@@ -11,8 +11,9 @@ import qualified Data.Map as Map
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 
-import Parser (Parser, parseInt)
 import Debug.Trace (trace)
+
+import Common.Parsers (Parser, parseInt)
 
 data Registers = Registers
   { regA :: Int

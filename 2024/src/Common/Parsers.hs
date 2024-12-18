@@ -1,4 +1,4 @@
-module Parser
+module Common.Parsers
   ( Parser
   , parseInt
 ) where
