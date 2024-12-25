@@ -82,7 +82,7 @@ bfsOnN rep nexts start = go S.empty (Seq.fromList start)
 -- underestimate the cost to the goal
 aStar :: Ord a
       => (a -> [(a, Int)]) -- ^ Generations of Next States
-      -> (a -> Int)        -- ^ Huristic
+      -> (a -> Int)        -- ^ Heuristic
       -> a                 -- ^ Initial state
       -> [(a, Int)]        -- ^ Reachable States
 aStar = aStarOn id
@@ -90,7 +90,7 @@ aStar = aStarOn id
 aStarOn :: (Ord a, Ord b)
         => (a -> b)          -- ^ State Repersentation
         -> (a -> [(a, Int)]) -- ^ Generations of Next States
-        -> (a -> Int)        -- ^ Huristic
+        -> (a -> Int)        -- ^ Heuristic
         -> a                 -- ^ Initial state
         -> [(a, Int)]        -- ^ Reachable States
 aStarOn rep nexts heuristic start =

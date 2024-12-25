@@ -26,3 +26,10 @@ genNextStepsCheck check pos = filter check $ possibleCoords pos
 
 genNextStepsCheckWeight :: (Coord -> Bool) -> (Coord -> (Coord, Int)) -> Coord -> [(Coord, Int)]
 genNextStepsCheckWeight check weight pos = map weight $ filter check $ possibleCoords pos
+
+
+findSub :: (Eq a) => [a] -> [a] -> Maybe Int
+findSub sub s
+  | length sub > length s      = Nothing
+  | take (length sub) s == sub = Just 0
+  | otherwise                  = fmap (+1) $ findSub sub $ drop 1 s
