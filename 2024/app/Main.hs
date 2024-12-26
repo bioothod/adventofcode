@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Day22
+import Day23
 
 import qualified Data.ByteString as BS (readFile)
 import System.Environment (getArgs)

@@ -51,6 +51,7 @@ library
       Day20
       Day21
       Day22
+      Day23
   other-modules:
       Paths_adv2024
   hs-source-dirs:
