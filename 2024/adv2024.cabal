@@ -52,6 +52,7 @@ library
       Day21
       Day22
       Day23
+      Day24
   other-modules:
       Paths_adv2024
   hs-source-dirs:
@@ -60,12 +61,15 @@ library
       LambdaCase
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
+    , base-prelude
     , bytestring
     , bytestring-trie
     , containers
-    , linearEqSolver
+    , linear
     , megaparsec
+    , microlens-platform
     , psqueues
     , replace-megaparsec
     , text

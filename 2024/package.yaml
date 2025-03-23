@@ -43,9 +43,13 @@ library:
         - replace-megaparsec
         - containers
         - vector
-        - linearEqSolver
         - psqueues
         - bytestring-trie
+        - linear
+        - microlens-platform
+        - text
+        - array
+        - base-prelude
 
 executables:
   adv2024-exe:
