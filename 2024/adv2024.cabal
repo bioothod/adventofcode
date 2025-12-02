@@ -29,6 +29,7 @@ library
       Common.Parsers
       Common.Search
       Common.Utils
+      Common.Utils1
       Day01
       Day02
       Day03
@@ -61,7 +62,8 @@ library
       LambdaCase
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      array
+      MemoTrie
+    , array
     , base >=4.7 && <5
     , base-prelude
     , bytestring
@@ -84,7 +86,8 @@ executable adv2024-exe
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      adv2024
+      MemoTrie
+    , adv2024
     , base >=4.7 && <5
     , bytestring
     , text

@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - bytestring
 - text
+- MemoTrie
 
 ghc-options:
 - -Wall
@@ -50,6 +51,7 @@ library:
         - text
         - array
         - base-prelude
+        - MemoTrie
 
 executables:
   adv2024-exe:
