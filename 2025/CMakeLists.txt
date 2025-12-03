@@ -50,7 +50,7 @@ endmacro()
 
 # Add all days, target will be `day01`
 add_day(01)
-#add_day(02)
+add_day(02)
 #add_day(03)
 # add_day(04)
 # add_day(05 Boost::regex)
