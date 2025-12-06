@@ -1,3 +1,4 @@
+#include <concepts>
 #include <format>
 #include <tuple>
 #include <iostream>
@@ -54,5 +55,20 @@ std::pair<std::string, int> split_prefix_number(const std::string& s) {
     return {prefix, number};
 }
 
+unsigned long long quick_pow10(int n)
+{
+  static std::vector<unsigned long long> pow10 = {
+    1, 10, 100, 1000, 10000,
+    100000, 1000000, 10000000, 100000000, 1000000000,
+    10000000000, 100000000000, 1000000000000, 10000000000000,
+    100000000000000, 1000000000000000, 10000000000000000, 100000000000000000,
+  };
+
+  if ((size_t)n >= pow10.size()) {
+    throw std::invalid_argument(std::format("quick_pow10({}): n is too big, max is {}", n, pow10.size()));
+  }
+
+  return pow10[n];
+}
 
 } // namespace aoc
