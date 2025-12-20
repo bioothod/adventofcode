@@ -59,41 +59,11 @@ struct Line {
     return (y > min_y and y < max_y);
   }
 
-  std::pair<bool, aoc::Coord> cross_simple(const Line &other) const {
-    // only cross is one is vertical and another one is horizontal
-    if (a.x() == b.x() and other.a.y() == other.b.y()) {
-      if (y_inside(other.a.y()) and other.x_inside(a.x())) {
-        return {true, aoc::Coord{a.x(), other.a.y()}};
-      }
-    } else if (a.y() == b.y() and other.a.x() == other.b.x()) {
-      if (x_inside(other.a.x()) and other.y_inside(a.y())) {
-        return {true, aoc::Coord{other.a.x(), a.y()}};
-      }
-    }
-
-    return {false, a};
+  bool is_vertical() const {
+    return a.x() == b.x();
   }
-
-  std::pair<bool, int> is_inside_point(const aoc::Coord &p) const {
-    if (a.x() == b.x()) {
-      if (a.y() < b.y()) {
-        return {(p.x() <= a.x() and y_inside(p)), 1};
-      } else {
-        return {(p.x() >= a.x() and y_inside(p)), 2};
-      }
-      return {false, 0};
-    }
-
-    if (a.y() == b.y()) {
-      if (a.x() < b.x()) {
-        return {(p.y() >= a.y() and x_inside(p)), 3};
-      } else {
-        return {(p.y() <= a.y() and x_inside(p)), 4};
-      }
-      return {false, 0};
-    }
-
-    return {false, 0};
+  bool is_horizontal() const {
+    return a.y() == b.y();
   }
 };
 
@@ -112,37 +82,23 @@ std::ostream &operator<< (std::ostream &outs, const std::pair<aoc::Coord, aoc::C
   return outs;
 }
 
-long long cross(const aoc::Coord &s, const aoc::Coord &a, const aoc::Coord &b) {
-  auto sa = a - s;
-  auto sb = b - s;
-  return sa.x()*sb.y() - sa.y()*sb.x();
-}
-
-bool on_line(const Line &l, const aoc::Coord &p) {
-  if (cross(p, l.a, l.b) != 0) {
-    return false;
-  }
-
-  if (!l.x_inside(p.x()) or !l.y_inside(p.y())) {
-    return false;
-  }
-
-  return true;
-}
-
 bool inside(const std::vector<Line> &lines, const aoc::Coord &p) {
-  for (auto &l: lines) {
-    if (on_line(l, p)) {
-      return true;
-    }
-  }
-
   bool inside = false;
   for (auto &l: lines) {
-    if ((l.a.y() > p.y()) != (l.b.y() > p.y())) {
-      auto x_cross = l.a.x() + (p.y() - l.a.y()) * (l.b.x() - l.a.x()) / (l.b.y() - l.a.y());
-      if (p.x() <= x_cross) {
+    if (l.is_vertical()) {
+      if (p.x() == l.a.x() and l.y_inside(p)) {
+        return true;
+      }
+
+      auto y_max = std::max(l.a.y(), l.b.y());
+      auto y_min = std::min(l.a.y(), l.b.y());
+
+      if (l.a.x() > p.x() and p.y() >= y_min and p.y() < y_max) {
         inside = !inside;
+      }
+    } else {
+      if (p.y() == l.a.y() and l.x_inside(p)) {
+        return true;
       }
     }
   }
@@ -151,15 +107,11 @@ bool inside(const std::vector<Line> &lines, const aoc::Coord &p) {
 }
 
 bool lines_cross_ex(const Line &l0, const Line &l1) {
-  auto c0 = cross(l0.a, l0.b, l1.a);
-  auto c1 = cross(l0.a, l0.b, l1.b);
-  auto c2 = cross(l1.a, l1.b, l0.a);
-  auto c3 = cross(l1.a, l1.b, l0.b);
-  if (c0 == 0 or c1 == 0 or c2 == 0 or c3 == 0) {
-    return false;
+  if (l0.is_horizontal()) {
+    return (l1.y_inside_ex(l0.a.y()) and l0.x_inside_ex(l1.a.x()));
+  } else {
+    return (l1.x_inside_ex(l0.a.x()) and l0.y_inside_ex(l1.a.y()));
   }
-
-  return (c0 > 0) != (c1 > 0) and (c2 > 0) != (c3 > 0);
 }
 
 bool inside_polygon(const std::vector<Line> &lines, const aoc::Coord &a, const aoc::Coord &b) {
@@ -215,7 +167,6 @@ long long solve_part2(const std::vector<aoc::Coord> &coords) {
                                            const std::tuple<long long, aoc::Coord, aoc::Coord> &b) {
     return std::get<0>(a) > std::get<0>(b);
   });
-  //std::reverse(areas.begin(), areas.end());
 
   for (auto &[area, a, b]: areas) {
     if (inside_polygon(lines, a, b)) {
